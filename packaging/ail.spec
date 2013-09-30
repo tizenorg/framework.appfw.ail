@@ -46,6 +46,9 @@ make %{?jobs:-j%jobs}
 %install
 %make_install
 
+mkdir -p %{buildroot}/usr/share/license
+cp LICENSE %{buildroot}/usr/share/license/%{name}
+
 %post
 vconftool set -t string db/ail/ail_info "0" -f -s system::vconf_inhouse
 vconftool set -t string db/menuscreen/desktop "0" -f -s system::vconf_inhouse
@@ -86,6 +89,7 @@ update_DAC_for_db_file /opt/dbspace/.app_info.db-journal
 /usr/bin/ail_filter
 /usr/bin/ail_package
 /usr/share/install-info/*
+/usr/share/license/%{name}
 
 %files devel
 /usr/include/ail.h
