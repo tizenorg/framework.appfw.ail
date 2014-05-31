@@ -1,0 +1,17 @@
+<manifest>
+	<define>
+		<domain name="ail"/>
+		<provide>
+			<label name="ail::db"/>
+		</provide>
+	</define>
+	<request>
+		<domain name="_"/>
+	</request>
+	<assign>
+		<filesystem path="/usr/bin/ail_desktop" label="_" exec_label="none"/>
+		<filesystem path="/usr/bin/ail_filter" label="_" exec_label="none"/>
+		<filesystem path="/usr/bin/ail_initdb" label="_" exec_label="none"/>
+		<filesystem path="/usr/bin/ail_package" label="_" exec_label="none"/>
+	</assign>
+</manifest>
