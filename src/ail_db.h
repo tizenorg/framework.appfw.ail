@@ -37,6 +37,7 @@ typedef enum {
 typedef int (*sqlite_query_callback)(void *data, int ncols, char **coltxt, char **colname);
 
 ail_error_e db_open(db_open_mode mode);
+ail_error_e db_open_pkg_mgr(db_open_mode mode);
 ail_error_e db_prepare(const char *query, sqlite3_stmt **stmt);
 
 ail_error_e db_bind_bool(sqlite3_stmt *stmt, int idx, bool value);

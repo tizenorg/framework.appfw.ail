@@ -80,12 +80,9 @@ static struct _ail_map_t prop_map[] = {
 	{E_AIL_PROP_X_SLP_PACKAGETYPE_STR, 	AIL_PROP_X_SLP_PACKAGETYPE_STR},
 	{E_AIL_PROP_X_SLP_PACKAGECATEGORIES_STR, AIL_PROP_X_SLP_PACKAGECATEGORIES_STR},
 	{E_AIL_PROP_X_SLP_PACKAGEID_STR, 	AIL_PROP_X_SLP_PACKAGEID_STR},
+	{E_AIL_PROP_X_SLP_URI_STR, AIL_PROP_X_SLP_URI_STR},
 	{E_AIL_PROP_X_SLP_SVC_STR, 		AIL_PROP_X_SLP_SVC_STR},
 	{E_AIL_PROP_X_SLP_EXE_PATH, 		AIL_PROP_X_SLP_EXE_PATH},
-	{E_AIL_PROP_NODISPLAY_BOOL, AIL_PROP_NODISPLAY_BOOL},
-	{E_AIL_PROP_X_SLP_TASKMANAGE_BOOL, AIL_PROP_NODISPLAY_BOOL},
-	{E_AIL_PROP_X_SLP_MULTIPLE_BOOL, AIL_PROP_X_SLP_MULTIPLE_BOOL},
-	{E_AIL_PROP_X_SLP_REMOVABLE_BOOL, AIL_PROP_X_SLP_REMOVABLE_BOOL},
 	{E_AIL_PROP_X_SLP_APPID_STR, AIL_PROP_X_SLP_APPID_STR},
 	{E_AIL_PROP_X_SLP_PKGID_STR, AIL_PROP_X_SLP_PKGID_STR},
 	{E_AIL_PROP_X_SLP_DOMAIN_STR, AIL_PROP_X_SLP_DOMAIN_STR},
@@ -94,13 +91,14 @@ static struct _ail_map_t prop_map[] = {
 	{E_AIL_PROP_X_SLP_TEMP_INT, AIL_PROP_X_SLP_TEMP_INT},
 	{E_AIL_PROP_X_SLP_INSTALLEDTIME_INT, AIL_PROP_X_SLP_INSTALLEDTIME_INT},
 	{E_AIL_PROP_NODISPLAY_BOOL, AIL_PROP_NODISPLAY_BOOL},
-	{E_AIL_PROP_X_SLP_TASKMANAGE_BOOL, AIL_PROP_X_SLP_TASKMANAGE_BOOL},
+	{E_AIL_PROP_X_SLP_TASKMANAGE_BOOL, AIL_PROP_NODISPLAY_BOOL},
 	{E_AIL_PROP_X_SLP_MULTIPLE_BOOL, AIL_PROP_X_SLP_MULTIPLE_BOOL},
 	{E_AIL_PROP_X_SLP_REMOVABLE_BOOL, AIL_PROP_X_SLP_REMOVABLE_BOOL},
 	{E_AIL_PROP_X_SLP_ISHORIZONTALSCALE_BOOL, AIL_PROP_X_SLP_ISHORIZONTALSCALE_BOOL},
 	{E_AIL_PROP_X_SLP_ENABLED_BOOL, AIL_PROP_X_SLP_ENABLED_BOOL},
 	{E_AIL_PROP_X_SLP_SUBMODE_BOOL, AIL_PROP_X_SLP_SUBMODE_BOOL}
 };
+
 
 static const char *_ail_convert_to_property(int prop)
 {
@@ -168,17 +166,17 @@ ail_cb_ret_e appinfo_list_func(const ail_appinfo_h appinfo, void *user_data)
 		switch(t) {
 			case VAL_TYPE_BOOL:
 				error = ail_appinfo_get_bool(appinfo, _ail_convert_to_property(i), &b);
-				if (error) ret = AIL_CB_RET_CANCEL;
+				if (error != AIL_ERROR_OK) ret = AIL_CB_RET_CANCEL;
 				printf("%s|",b?"true":"false");
 				break;
 			case VAL_TYPE_INT:
-				ail_appinfo_get_int(appinfo, _ail_convert_to_property(i), &n);
-				if (error) ret = AIL_CB_RET_CANCEL;
+				error = ail_appinfo_get_int(appinfo, _ail_convert_to_property(i), &n);
+				if (error != AIL_ERROR_OK) ret = AIL_CB_RET_CANCEL;
 				printf("%d|", n);
 				break;
 			case VAL_TYPE_STR:
-				ail_appinfo_get_str(appinfo, _ail_convert_to_property(i), &rs);
-				if (error) ret = AIL_CB_RET_CANCEL;
+				error = ail_appinfo_get_str(appinfo, _ail_convert_to_property(i), &rs);
+				if (error != AIL_ERROR_OK) ret = AIL_CB_RET_CANCEL;
 				printf("%s|", rs);
 				break;
 			default:
@@ -229,12 +227,12 @@ int main(int argc, char *argv[])
 		{ "taskmanage", 1, &(e.prop), E_AIL_PROP_X_SLP_TASKMANAGE_BOOL},
 		{ "multiple", 1, &(e.prop), E_AIL_PROP_X_SLP_MULTIPLE_BOOL},
 		{ "removable", 1, &(e.prop), E_AIL_PROP_X_SLP_REMOVABLE_BOOL},
-		{ "appid", 1, &(e.prop), AIL_PROP_X_SLP_APPID_STR},
-		{ "pkgid", 1, &(e.prop), AIL_PROP_X_SLP_PKGID_STR},
+		{ "appid", 1, &(e.prop), E_AIL_PROP_X_SLP_APPID_STR},
+		{ "pkgid", 1, &(e.prop), E_AIL_PROP_X_SLP_PKGID_STR},
 		{ "submode", 1, &(e.prop), E_AIL_PROP_X_SLP_SUBMODE_BOOL},
-		{ "submodemainid", 1, &(e.prop), AIL_PROP_X_SLP_SUBMODEMAINID_STR},
-		{ "installedstorage", 1, &(e.prop), AIL_PROP_X_SLP_INSTALLEDSTORAGE_STR},
-		{ "domain", 1, &(e.prop), AIL_PROP_X_SLP_DOMAIN_STR},
+		{ "submodemainid", 1, &(e.prop), E_AIL_PROP_X_SLP_SUBMODEMAINID_STR},
+		{ "installedstorage", 1, &(e.prop), E_AIL_PROP_X_SLP_INSTALLEDSTORAGE_STR},
+		{ "domain", 1, &(e.prop), E_AIL_PROP_X_SLP_DOMAIN_STR},
 		{ 0, 0, 0, 0 },
 	};
 

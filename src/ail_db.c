@@ -54,12 +54,10 @@ static __thread struct {
 
 ail_error_e db_open(db_open_mode mode)
 {
-	int ret;
-	int changed = 0;
+	int ret = AIL_ERROR_OK;
 
 	if(mode & DB_OPEN_RO) {
 		if (!db_info.dbro) {
-			//ret = db_util_open_with_options(APP_INFO_DB, &db_info.dbro, SQLITE_OPEN_READONLY, NULL);
 			ret = db_util_open(APP_INFO_DB, &db_info.dbro, 0);
 			retv_with_dbmsg_if(ret != SQLITE_OK, AIL_ERROR_DB_FAILED);
 		}
@@ -68,6 +66,28 @@ ail_error_e db_open(db_open_mode mode)
 	if(mode & DB_OPEN_RW) {
 		if (!db_info.dbrw) {
 			ret = db_util_open(APP_INFO_DB, &db_info.dbrw, 0);
+			retv_with_dbmsg_if(ret != SQLITE_OK, AIL_ERROR_DB_FAILED);
+		}
+	}
+
+	return AIL_ERROR_OK;
+}
+
+
+ail_error_e db_open_pkg_mgr(db_open_mode mode)
+{
+	int ret = AIL_ERROR_OK;
+
+	if(mode & DB_OPEN_RO) {
+		if (!db_info.dbro) {
+			ret = db_util_open(PKGMGR_PARSER_DB, &db_info.dbro, 0);
+			retv_with_dbmsg_if(ret != SQLITE_OK, AIL_ERROR_DB_FAILED);
+		}
+	}
+
+	if(mode & DB_OPEN_RW) {
+		if (!db_info.dbrw) {
+			ret = db_util_open(PKGMGR_PARSER_DB, &db_info.dbrw, 0);
 			retv_with_dbmsg_if(ret != SQLITE_OK, AIL_ERROR_DB_FAILED);
 		}
 	}
@@ -90,7 +110,7 @@ ail_error_e db_prepare(const char *query, sqlite3_stmt **stmt)
 		_E("%s\n", sqlite3_errmsg(db_info.dbro));
 		_E("%d\n", sqlite3_extended_errcode(db_info.dbro));
 		return AIL_ERROR_DB_FAILED;
-	} else 
+	} else
 		return AIL_ERROR_OK;
 }
 

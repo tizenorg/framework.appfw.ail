@@ -111,7 +111,7 @@ static ail_error_e _get_appinfo(const char *package, const char *property)
 
 	ret = ail_package_get_appinfo(package, &handle);
 	if (ret != AIL_ERROR_OK) {
-		return AIL_ERROR_FAIL;
+		goto END;
 	}
 
 	prop = _get_property(property);
@@ -154,31 +154,12 @@ END:
 
 int main(int argc, char** argv)
 {
-	int len = 0;
 	ail_error_e ret = AIL_ERROR_OK;
-	char *appid = NULL;
-	char *property = NULL;
+
 
 	if (4 == argc) {
 		if (!strncmp(argv[1], "get", 3)) {
-
-			len = (strlen(argv[2]) + 1);
-			appid = (char *)calloc(len, sizeof(char));
-			if(appid == NULL)
-				return EXIT_FAILURE;
-			strncpy(appid, argv[2], len - 1);
-
-			len = (strlen(argv[3]) + 1);
-			property = (char *)calloc(len, sizeof(char));
-			if(property == NULL) {
-				free(appid);
-				return EXIT_FAILURE;
-			}
-			strncpy(property, argv[3], len - 1);
-
-			ret = _get_appinfo(appid, property);
-			free(appid);
-			free(property);
+			ret = _get_appinfo(argv[2], argv[3]);
 		}
 	}
 	else {

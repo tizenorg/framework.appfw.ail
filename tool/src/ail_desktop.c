@@ -106,8 +106,6 @@ static ail_error_e _remove_desktop(const char *package)
 int main(int argc, char** argv)
 {
 	ail_error_e ret = AIL_ERROR_OK;
-	int len = 0;
-	char *appid = NULL;
 
 	if (3 == argc) {
 		if (!strncmp(argv[1], "add", 3)) {
@@ -115,13 +113,7 @@ int main(int argc, char** argv)
 		} else if (!strncmp(argv[1], "update", 6)) {
 			ret = _update_desktop(argv[2]);
 		} else if (!strncmp(argv[1], "remove", 6)) {
-			len = (strlen(argv[2]) + 1);
-			appid = (char *)calloc(len, sizeof(char));
-			if(appid == NULL)
-				return EXIT_FAILURE;
-			strncpy(appid, argv[2], len - 1);
-			ret = _remove_desktop(appid);
-			free(appid);
+			ret = _remove_desktop(argv[2]);
 		} else {
 			fprintf(stderr, "%s is a invalid command\n", argv[1]);
 		}

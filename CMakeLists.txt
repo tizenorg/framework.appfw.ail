@@ -53,3 +53,4 @@ INSTALL(FILES ${CMAKE_SOURCE_DIR}/desktop.conf DESTINATION share/install-info)
 
 # AIL init database
 ADD_SUBDIRECTORY(tool)
+ADD_SUBDIRECTORY(test)

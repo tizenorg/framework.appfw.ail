@@ -1,7 +1,7 @@
 #sbs-git:slp/pkgs/a/ail ail 0.2.22 29ac1f2c98453cad647cca6a92abc7da3dbb047b
 Name:       ail
 Summary:    Application Information Library
-Version:    0.2.87
+Version:    0.2.95
 Release:    1
 Group:      System/Libraries
 License:    Apache License, Version 2.0
@@ -80,16 +80,13 @@ update_DAC_for_db_file /opt/dbspace/.app_info.db-journal
 %postun
 
 %files
-%if %{_repository} == "wearable"
-%manifest ail-wearable.manifest
-%else
-%manifest ail-mobile.manifest
-%endif
+%manifest ail.manifest
 %{_libdir}/libail.so.0
 %{_libdir}/libail.so.0.1.0
 /usr/bin/ail_initdb
 /usr/bin/ail_desktop
 /usr/bin/ail_filter
+/usr/bin/ail_test
 /usr/bin/ail_package
 /usr/share/install-info/*
 /usr/share/license/%{name}

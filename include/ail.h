@@ -67,6 +67,7 @@ extern "C" {
 #define	AIL_PROP_X_SLP_PACKAGETYPE_STR		"AIL_PROP_X_SLP_PACKAGETYPE_STR"
 #define	AIL_PROP_X_SLP_PACKAGECATEGORIES_STR	"AIL_PROP_X_SLP_PACKAGECATEGORIES_STR"
 #define	AIL_PROP_X_SLP_PACKAGEID_STR		"AIL_PROP_X_SLP_PACKAGEID_STR"
+#define	AIL_PROP_X_SLP_URI_STR			"AIL_PROP_X_SLP_URI_STR"
 #define	AIL_PROP_X_SLP_SVC_STR			"AIL_PROP_X_SLP_SVC_STR"
 #define	AIL_PROP_X_SLP_EXE_PATH			"AIL_PROP_X_SLP_EXE_PATH"
 #define	AIL_PROP_X_SLP_APPID_STR		"AIL_PROP_X_SLP_APPID_STR"
@@ -103,7 +104,7 @@ typedef struct ail_filter *ail_filter_h;
 typedef struct ail_appinfo *ail_appinfo_h;
 
 /**
- * @brief return values 
+ * @brief return values
  */
 typedef enum {
 	AIL_ERROR_OK = 0,						/**< General success */
@@ -493,7 +494,7 @@ int list_apps()
 	ail_filter_list_appinfo_foreach(filter, appinfo_func, (void *)&i);
 
 	ail_filter_destroy(filter);
-	
+
 	return 0;
 }
  * @endcode
@@ -957,7 +958,8 @@ static ail_error_e _get_name(const char *appid)
 }
  * @endcode
  */
-ail_error_e ail_destroy_appinfo(const ail_appinfo_h handle);
+
+ail_error_e ail_destroy_appinfo(ail_appinfo_h ai);
 
 /**
  * @fn ail_error_e ail_close_appinfo_db(void)

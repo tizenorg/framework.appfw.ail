@@ -27,6 +27,8 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <errno.h>
 
 #include "ail.h"
@@ -114,7 +116,7 @@ int initdb_load_directory(const char *directory)
 {
 	DIR *dir;
 	struct dirent entry, *result;
-	int len, ret;
+	int ret;
 	char buf[BUFSZE];
 	int total_cnt = 0;
 	int ok_cnt = 0;
@@ -127,7 +129,6 @@ int initdb_load_directory(const char *directory)
 		return AIL_ERROR_FAIL;
 	}
 
-	len = strlen(directory) + 1;
 	_D("Loading desktop files from %s", directory);
 
 	for (ret = readdir_r(dir, &entry, &result);

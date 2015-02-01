@@ -94,6 +94,7 @@ enum {
 
 #define AIL_SQL_QUERY_MAX_LEN	2048
 #define APP_INFO_DB "/opt/dbspace/.app_info.db"
+#define PKGMGR_PARSER_DB "/opt/dbspace/.pkgmgr_parser.db"
 
 #define ELEMENT_TYPE(e, t) do { \
 	if(e->prop >= E_AIL_PROP_STR_MIN && e->prop <= E_AIL_PROP_STR_MAX) t= (int)VAL_TYPE_STR; \

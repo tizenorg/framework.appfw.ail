@@ -38,6 +38,7 @@
 #include "ail_db.h"
 #include "ail_sql.h"
 #include "ail.h"
+#include "ail_convert.h"
 
 #define OPT_DESKTOP_DIRECTORY "/opt/share/applications"
 #define USR_DESKTOP_DIRECTORY "/usr/share/applications"
@@ -362,7 +363,10 @@ static ail_error_e _read_mimetype(void *data, char *tag, char *value)
 {
 	desktop_info_s *info = data;
 	int size, total_len = 0;
-	char *mimes_origin, *mimes_changed, *token_unalias, *save_ptr;
+	char *mimes_origin = NULL;
+	char *mimes_changed = NULL;
+	char *token_unalias = NULL;
+	char *save_ptr = NULL;
 
 	retv_if(!data, AIL_ERROR_INVALID_PARAMETER);
 	retv_if(!value, AIL_ERROR_INVALID_PARAMETER);
@@ -398,6 +402,10 @@ static ail_error_e _read_mimetype(void *data, char *tag, char *value)
 			tmp = realloc(mimes_changed, size);
 			if(!tmp) {
 				free(mimes_changed);
+
+				if (mimes_origin)
+					free(mimes_origin);
+
 				return AIL_ERROR_OUT_OF_MEMORY;
 			}
 			mimes_changed = tmp;
@@ -414,6 +422,9 @@ static ail_error_e _read_mimetype(void *data, char *tag, char *value)
 
 	SAFE_FREE(info->mimetype);
 	info->mimetype = mimes_changed;
+
+	if (mimes_origin)
+		free(mimes_origin);
 
 	return AIL_ERROR_OK;
 }
@@ -1073,7 +1084,6 @@ static ail_error_e _modify_desktop_info_bool(desktop_info_s* info,
 						  bool value)
 {
 	ail_prop_bool_e prop;
-	int val;
 
 	retv_if(!info, AIL_ERROR_INVALID_PARAMETER);
 	retv_if(!property, AIL_ERROR_INVALID_PARAMETER);
@@ -1099,8 +1109,7 @@ static ail_error_e _modify_desktop_info_str(desktop_info_s* info,
 						  const char *property,
 						  const char *value)
 {
-	ail_prop_bool_e prop;
-	int val;
+	ail_prop_str_e prop;
 
 	retv_if(!info, AIL_ERROR_INVALID_PARAMETER);
 	retv_if(!property, AIL_ERROR_INVALID_PARAMETER);
@@ -1207,10 +1216,8 @@ static inline void _insert_localname(gpointer data, gpointer user_data)
 
 static ail_error_e _insert_desktop_info(desktop_info_s *info)
 {
-	int len;
 	ail_error_e ret;
 
-	len = _strlen_desktop_info(info) + (0x01 << 10);
 
 	char *query = sqlite3_mprintf("insert into app_info ("
 		"package, "
@@ -1309,7 +1316,6 @@ static ail_error_e _insert_desktop_info(desktop_info_s *info)
 
 static ail_error_e _update_desktop_info(desktop_info_s *info)
 {
-	int len;
 
 	retv_if (NULL == info, AIL_ERROR_INVALID_PARAMETER);
 
@@ -1318,7 +1324,6 @@ static ail_error_e _update_desktop_info(desktop_info_s *info)
 		return AIL_ERROR_DB_FAILED;
 	}
 
-	len = _strlen_desktop_info(info) + (0x01 << 10);
 
 	char *query = sqlite3_mprintf("update app_info set "
 		"exec=%Q, "
@@ -1410,7 +1415,6 @@ static ail_error_e _update_desktop_info(desktop_info_s *info)
 
 static ail_error_e _remove_package(const char* package)
 {
-	int size;
 	char *query = NULL;
 
 	retv_if(!package, AIL_ERROR_INVALID_PARAMETER);
@@ -1419,7 +1423,6 @@ static ail_error_e _remove_package(const char* package)
 		return AIL_ERROR_DB_FAILED;
 	}
 
-	size = strlen(package) + (0x01 << 10);
 
 	query = sqlite3_mprintf("delete from app_info where package = %Q", package);
 
@@ -1447,7 +1450,6 @@ static ail_error_e _remove_package(const char* package)
 
 static ail_error_e _clean_pkgid_data(const char* pkgid)
 {
-	int size;
 	char *query = NULL;
 
 	retv_if(!pkgid, AIL_ERROR_INVALID_PARAMETER);
@@ -1456,7 +1458,6 @@ static ail_error_e _clean_pkgid_data(const char* pkgid)
 		return AIL_ERROR_DB_FAILED;
 	}
 
-	size = strlen(pkgid) + (0x01 << 10);
 
 	query = sqlite3_mprintf("delete from app_info where x_slp_pkgid = %Q", pkgid);
 	if (db_exec(query) < 0) {
@@ -1573,8 +1574,8 @@ static int __is_authorized()
 EXPORT_API ail_error_e ail_desktop_add(const char *appid)
 {
 	desktop_info_s info = {0,};
-	ail_error_e ret;
-	int count;
+	ail_error_e ret = AIL_ERROR_OK;
+	int count = 0;
 
 	retv_if(!appid, AIL_ERROR_INVALID_PARAMETER);
 	if (!__is_authorized()) {
@@ -1583,7 +1584,7 @@ EXPORT_API ail_error_e ail_desktop_add(const char *appid)
 	}
 
 	count = _count_all();
-	if (count <= 0) {
+	if (count >= 0) {
 		ret = _create_table();
 		if (ret != AIL_ERROR_OK) {
 			_D("Cannot create a table. Maybe there is already a table.");
@@ -1591,18 +1592,28 @@ EXPORT_API ail_error_e ail_desktop_add(const char *appid)
 	}
 
 	ret = _init_desktop_info(&info, appid);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _read_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _insert_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _send_db_done_noti(NOTI_ADD, appid);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
+err_check:
 	_fini_desktop_info(&info);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
 
 	return AIL_ERROR_OK;
 }
@@ -1612,7 +1623,7 @@ EXPORT_API ail_error_e ail_desktop_add(const char *appid)
 EXPORT_API ail_error_e ail_desktop_update(const char *appid)
 {
 	desktop_info_s info = {0,};
-	ail_error_e ret;
+	ail_error_e ret = AIL_ERROR_OK;
 
 	retv_if(!appid, AIL_ERROR_INVALID_PARAMETER);
 	if (!__is_authorized()) {
@@ -1621,18 +1632,28 @@ EXPORT_API ail_error_e ail_desktop_update(const char *appid)
 	}
 
 	ret = _init_desktop_info(&info, appid);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _read_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _update_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _send_db_done_noti(NOTI_UPDATE, appid);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
+err_check:
 	_fini_desktop_info(&info);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
 
 	return AIL_ERROR_OK;
 }
@@ -1698,15 +1719,23 @@ EXPORT_API ail_error_e ail_desktop_fota(const char *appid)
 	}
 
 	ret = _init_desktop_info(&info, appid);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _read_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _insert_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
+err_check:
 	_fini_desktop_info(&info);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
 
 	return AIL_ERROR_OK;
 }
@@ -1725,23 +1754,35 @@ EXPORT_API ail_error_e ail_desktop_appinfo_modify_bool(const char *appid,
 		AIL_ERROR_INVALID_PARAMETER);
 
 	ret = _init_desktop_info(&info, appid);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _load_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _modify_desktop_info_bool(&info, property, value);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _update_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	if (broadcast) {
 		ret = _send_db_done_noti(NOTI_UPDATE, appid);
-		retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+		if(ret != AIL_ERROR_OK) {
+			goto err_check;
+		}
 	}
 
+err_check:
 	_fini_desktop_info(&info);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
 
 	return AIL_ERROR_OK;
 }
@@ -1752,31 +1793,27 @@ EXPORT_API ail_error_e ail_desktop_appinfo_modify_str(const char *appid,
 							     const char *value,
 							     bool broadcast)
 {
-	desktop_info_s info = {0,};
-	ail_error_e ret;
-
 	retv_if(!appid, AIL_ERROR_INVALID_PARAMETER);
 
-	ret = _init_desktop_info(&info, appid);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	ail_error_e ret = 0;
+	sqlite3_stmt *stmt = NULL;
+	sqlite3 *appinfo_db = NULL;
 
-	ret = _load_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	_D("appinfo_modify_str : %s,  %s", appid, value);
 
-	_D("info.name [%s], value [%s]", info.name, value);
-	ret = _modify_desktop_info_str(&info, property, value);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
-	_D("info.name [%s], value [%s]", info.name, value);
+	ret = db_util_open(PKGMGR_PARSER_DB, &appinfo_db, 0);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_DB_FAILED);
 
-	ret = _update_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	char *query = sqlite3_mprintf("delete from package_app_app_control where app_id=%Q", appid);
+	ret = sqlite3_exec(appinfo_db, query, NULL, NULL, NULL);
+	sqlite3_free(query);
 
-	if (broadcast) {
-		ret = _send_db_done_noti(NOTI_UPDATE, appid);
-		retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
-	}
+	query = sqlite3_mprintf("insert into package_app_app_control(app_id, app_control) values('%s', '%s')", appid, value);
+	ret = sqlite3_exec(appinfo_db, query, NULL, NULL, NULL);
+	sqlite3_free(query);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_DB_FAILED);
 
-	_fini_desktop_info(&info);
+	sqlite3_close(appinfo_db);
 
 	return AIL_ERROR_OK;
 }
