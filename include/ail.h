@@ -67,10 +67,14 @@ extern "C" {
 #define	AIL_PROP_X_SLP_PACKAGETYPE_STR		"AIL_PROP_X_SLP_PACKAGETYPE_STR"
 #define	AIL_PROP_X_SLP_PACKAGECATEGORIES_STR	"AIL_PROP_X_SLP_PACKAGECATEGORIES_STR"
 #define	AIL_PROP_X_SLP_PACKAGEID_STR		"AIL_PROP_X_SLP_PACKAGEID_STR"
+#define	AIL_PROP_X_SLP_URI_STR			"AIL_PROP_X_SLP_URI_STR"
 #define	AIL_PROP_X_SLP_SVC_STR			"AIL_PROP_X_SLP_SVC_STR"
 #define	AIL_PROP_X_SLP_EXE_PATH			"AIL_PROP_X_SLP_EXE_PATH"
 #define	AIL_PROP_X_SLP_APPID_STR		"AIL_PROP_X_SLP_APPID_STR"
-
+#define	AIL_PROP_X_SLP_PKGID_STR		"AIL_PROP_X_SLP_PKGID_STR"
+#define	AIL_PROP_X_SLP_DOMAIN_STR		"AIL_PROP_X_SLP_DOMAIN_STR"
+#define	AIL_PROP_X_SLP_SUBMODEMAINID_STR		"AIL_PROP_X_SLP_SUBMODEMAINID_STR"
+#define	AIL_PROP_X_SLP_INSTALLEDSTORAGE_STR		"AIL_PROP_X_SLP_INSTALLEDSTORAGE_STR"
 
 /**
  * @brief integer type properties
@@ -85,8 +89,9 @@ extern "C" {
 #define	AIL_PROP_X_SLP_TASKMANAGE_BOOL		"AIL_PROP_X_SLP_TASKMANAGE_BOOL"
 #define	AIL_PROP_X_SLP_MULTIPLE_BOOL		"AIL_PROP_X_SLP_MULTIPLE_BOOL"
 #define	AIL_PROP_X_SLP_REMOVABLE_BOOL		"AIL_PROP_X_SLP_REMOVABLE_BOOL"
-#define	AIL_PROP_X_SLP_INACTIVATED_BOOL		"AIL_PROP_X_SLP_INACTIVATED_BOOL"
-
+#define	AIL_PROP_X_SLP_ISHORIZONTALSCALE_BOOL	"AIL_PROP_X_SLP_ISHORIZONTALSCALE_BOOL"
+#define	AIL_PROP_X_SLP_ENABLED_BOOL		"AIL_PROP_X_SLP_ENABLED_BOOL"
+#define	AIL_PROP_X_SLP_SUBMODE_BOOL		"AIL_PROP_X_SLP_SUBMODE_BOOL"
 
 /**
  * @brief A handle for filters
@@ -99,7 +104,7 @@ typedef struct ail_filter *ail_filter_h;
 typedef struct ail_appinfo *ail_appinfo_h;
 
 /**
- * @brief return values 
+ * @brief return values
  */
 typedef enum {
 	AIL_ERROR_OK = 0,						/**< General success */
@@ -133,7 +138,7 @@ typedef enum {
  * External Apps.
  *
  * @code
-int count_packages()
+int count_apps()
 {
 	ail_filter_h filter;
 	ail_error_e ret;
@@ -160,7 +165,7 @@ int count_packages()
 	}
 	ret = ail_filter_destroy(filter);
 
-	printf("N of packages not to be displayed and supporting 'audo/wav' mime type = %d\n", n);
+	printf("N of apps not to be displayed and supporting 'audo/wav' mime type = %d\n", n);
 
 	return n;
 }
@@ -194,7 +199,7 @@ ail_error_e ail_filter_new(ail_filter_h *filter);
  * External Apps.
  *
  * @code
-int count_packages()
+int count_apps()
 {
 	ail_filter_h filter;
 	ail_error_e ret;
@@ -215,7 +220,7 @@ int count_packages()
 		return -1;
 	}
 
-	printf("N of packages = %d\n", n);
+	printf("N of apps = %d\n", n);
 
 	return n;
 }
@@ -248,7 +253,7 @@ ail_error_e ail_filter_add_int(ail_filter_h filter, const char *property, const 
  * External Apps.
  *
  * @code
-int count_packages()
+int count_apps()
 {
 	ail_filter_h filter;
 	ail_error_e ret;
@@ -269,7 +274,7 @@ int count_packages()
 		return -1;
 	}
 
-	fprintf(stderr, "N of packages = %d\n", n);
+	fprintf(stderr, "N of apps = %d\n", n);
 
 	return n;
 }
@@ -303,7 +308,7 @@ ail_error_e ail_filter_add_bool(ail_filter_h filter, const char *property, bool 
  * External Apps.
  *
  * @code
-int count_packages()
+int count_apps()
 {
 	ail_filter_h filter;
 	ail_error_e ret;
@@ -314,7 +319,7 @@ int count_packages()
 		return -1;
 	}
 
-	ret = ail_filter_add_str(filter, AIL_PROP_PACKAGE_STR, "org.tizen.memo");
+	ret = ail_filter_add_str(filter, AIL_PROP_PACKAGE_STR, "com.samsung.memo");
 	if (ret != AIL_ERROR_OK) {
 		return -1;
 	}
@@ -324,7 +329,7 @@ int count_packages()
 		return -1;
 	}
 
-	fprintf(stderr, "N of packages = %d\n", n);
+	fprintf(stderr, "N of apps = %d\n", n);
 
 	return n;
 }
@@ -355,7 +360,7 @@ ail_error_e ail_filter_add_str(ail_filter_h filter, const char *property, const 
  * External Apps.
  *
  * @code
-int count_packages()
+int count_apps()
 {
 	ail_filter_h filter;
 	ail_error_e ret;
@@ -376,7 +381,7 @@ int count_packages()
 		return -1;
 	}
 
-	printf("N of removable packages = %d\n", n);
+	printf("N of removable apps = %d\n", n);
 
 	ret = ail_filter_add_str(filter, AIL_PROP_MIMETYPE_STR, "audio/wav");
 	if (ret != AIL_ERROR_OK) {
@@ -388,7 +393,7 @@ int count_packages()
 		return -1;
 	}
 
-	printf("N of packages removable and supporting 'audo/wav' mime type = %d\n", n);
+	printf("N of apps removable and supporting 'audo/wav' mime type = %d\n", n);
 
 	ret = ail_filter_destroy(filter);
 
@@ -427,12 +432,12 @@ typedef ail_cb_ret_e (*ail_list_appinfo_cb) (const ail_appinfo_h appinfo_h, void
 /**
  * @fn ail_error_e ail_error_e ail_filter_list_appinfo_foreach(ail_filter_h filter, ail_list_appinfo_cb func, void *user_data)
  *
- * @brief Calls the callback function for each package filtered by given filter. If the filter is not given (i.e filter handle is NULL), it is invoked for all packages.
+ * @brief Calls the callback function for each app filtered by given filter. If the filter is not given (i.e filter handle is NULL), it is invoked for all apps.
  *
  * @par Sync (or) Async : Synchronous API
  *
  * @param[in] filter		a filter handle
- * @param[in] func			the function to call with each package's appinfo
+ * @param[in] func			the function to call with each app's appinfo
  * @param[in] user_data		user_data to pass to the function
  *
  * @return  0 if success, negative value(<0) if fail\n
@@ -453,10 +458,10 @@ typedef ail_cb_ret_e (*ail_list_appinfo_cb) (const ail_appinfo_h appinfo_h, void
 ail_cb_ret_e appinfo_func(const ail_appinfo_h appinfo, void *user_data)
 {
 	int *i = (int *)user_data;
-	char *package;
+	char *appid;
 
-	ail_appinfo_get_str(appinfo, AIL_PROP_PACKAGE_STR, &package);
-	printf("i=%d %s\n", (*i)++, package);
+	ail_appinfo_get_str(appinfo, AIL_PROP_PACKAGE_STR, &appid);
+	printf("i=%d %s\n", (*i)++, appid);
 
 	if (*i > 30)
 		return AIL_CB_RET_CANCEL;
@@ -464,7 +469,7 @@ ail_cb_ret_e appinfo_func(const ail_appinfo_h appinfo, void *user_data)
 	return AIL_CB_RET_CONTINUE;
 }
 
-int list_packages()
+int list_apps()
 {
 	ail_filter_h filter;
 	ail_error_e ret;
@@ -485,11 +490,11 @@ int list_packages()
 		return -1;
 	}
 
-	printf("List packages which are removable and 'Application' typed\n");
+	printf("List apps which are removable and 'Application' typed\n");
 	ail_filter_list_appinfo_foreach(filter, appinfo_func, (void *)&i);
 
 	ail_filter_destroy(filter);
-	
+
 	return 0;
 }
  * @endcode
@@ -503,7 +508,7 @@ ail_error_e ail_filter_list_appinfo_foreach(ail_filter_h filter,
 /**
  * @fn ail_error_e ail_error_e ail_filter_count_appinfo(ail_filter_h filter, int *count)
  *
- * @brief Gets the number of package which is filtered by the given filter. If the filter is not given (i.e filter handle is NULL), all package are counted.
+ * @brief Gets the number of app which is filtered by the given filter. If the filter is not given (i.e filter handle is NULL), all app are counted.
  *
  * @par Sync (or) Async : Synchronous API
  *
@@ -527,7 +532,7 @@ ail_error_e ail_filter_list_appinfo_foreach(ail_filter_h filter,
  * External Apps.
  *
  * @code
-int count_packages()
+int count_apps()
 {
 	ail_filter_h filter;
 	ail_error_e ret;
@@ -548,14 +553,14 @@ int count_packages()
 		return -1;
 	}
 
-	printf("N of package not to be displayed = %d", n);
+	printf("N of app not to be displayed = %d", n);
 
 	ret = ail_filter_count_appinfo(NULL, &n);
 	if (ret != AIL_ERROR_OK) {
 		return -1;
 	}
 
-	printf("N of all package = %d\n", n);
+	printf("N of all app = %d\n", n);
 
 	return n;
 }
@@ -620,7 +625,7 @@ static ail_error_e _get_name(const char *package)
 }
  * @endcode
  */
-ail_error_e ail_package_get_appinfo(const char *package, ail_appinfo_h *handle);
+ail_error_e ail_package_get_appinfo(const char *package, ail_appinfo_h *handle) __attribute__((deprecated));
 
 
 /**
@@ -641,7 +646,7 @@ ail_error_e ail_package_get_appinfo(const char *package, ail_appinfo_h *handle);
  * @retval 	AIL_ERROR_FAIL					internal error
  * @retval	AIL_ERROR_DB_FAILED				database error
  * @retval	AIL_ERROR_INVALID_PARAMETER		invalid parameter
- * @retval	AIL_ERROR_NO_DATA				no data. cannot find the package.
+ * @retval	AIL_ERROR_NO_DATA				no data. cannot find the app.
  *
  * @pre declare a handle before calling this function. The handle is used as a second argument of this API.
  * @post destroy the handle with the function of ail_get_appinfo after using it all.
@@ -708,13 +713,13 @@ ail_error_e ail_get_appinfo(const char *appid, ail_appinfo_h *handle);
  * External Apps.
  *
  * @code
-static ail_error_e _get_nodisplay(const char *package)
+static ail_error_e _get_nodisplay(const char *appid)
 {
 	ail_appinfo_h handle;
 	ail_error_e ret;
 	bool value;
 
-	ret = ail_get_appinfo(package, &handle);
+	ret = ail_get_appinfo(appid, &handle);
 	if (ret != AIL_ERROR_OK) {
 		return AIL_ERROR_FAIL;
 	}
@@ -723,7 +728,7 @@ static ail_error_e _get_nodisplay(const char *package)
 	if (ret != AIL_ERROR_OK) {
 		return AIL_ERROR_FAIL;
 	}
-	fprintf(stderr, "Package[%s] : %d\n", package, value);
+	fprintf(stderr, "appid[%s] : %d\n", appid, value);
 
 	ret = ail_destroy_appinfo(handle);
 	if (ret != AIL_ERROR_OK) {
@@ -765,13 +770,13 @@ ail_error_e ail_appinfo_get_bool(const ail_appinfo_h handle, const char *propert
  * External Apps.
  *
  * @code
-static ail_error_e _get_x_slp_baselayoutwidth(const char *package)
+static ail_error_e _get_x_slp_baselayoutwidth(const char *appid)
 {
 	ail_appinfo_h handle;
 	ail_error_e ret;
 	int value;
 
-	ret = ail_get_appinfo(package, &handle);
+	ret = ail_get_appinfo(appid, &handle);
 	if (ret != AIL_ERROR_OK) {
 		return AIL_ERROR_FAIL;
 	}
@@ -780,7 +785,7 @@ static ail_error_e _get_x_slp_baselayoutwidth(const char *package)
 	if (ret != AIL_ERROR_OK) {
 		return AIL_ERROR_FAIL;
 	}
-	fprintf(stderr, "Package[%s] : %d\n", package, value);
+	fprintf(stderr, "Package[%s] : %d\n", appid, value);
 
 	ret = ail_destroy_appinfo(handle);
 	if (ret != AIL_ERROR_OK) {
@@ -822,13 +827,13 @@ ail_error_e ail_appinfo_get_int(const ail_appinfo_h handle, const char *property
  * External Apps.
  *
  * @code
-static ail_error_e _get_nodisplay(const char *package)
+static ail_error_e _get_nodisplay(const char *appid)
 {
 	ail_appinfo_h handle;
 	ail_error_e ret;
 	char* value;
 
-	ret = ail_get_appinfo(package, &handle);
+	ret = ail_get_appinfo(appid, &handle);
 	if (ret != AIL_ERROR_OK) {
 		return AIL_ERROR_FAIL;
 	}
@@ -837,7 +842,7 @@ static ail_error_e _get_nodisplay(const char *package)
 	if (ret != AIL_ERROR_OK) {
 		return AIL_ERROR_FAIL;
 	}
-	fprintf(stderr, "Package[%s] : %d\n", package, value);
+	fprintf(stderr, "Package[%s] : %d\n", appid, value);
 
 	ret = ail_destroy_appinfo(handle);
 	if (ret != AIL_ERROR_OK) {
@@ -901,7 +906,7 @@ static ail_error_e _get_name(const char *package)
 }
  * @endcode
  */
-ail_error_e ail_package_destroy_appinfo(const ail_appinfo_h handle);
+ail_error_e ail_package_destroy_appinfo(const ail_appinfo_h handle) __attribute__((deprecated));
 
 
 /**
@@ -953,29 +958,84 @@ static ail_error_e _get_name(const char *appid)
 }
  * @endcode
  */
-ail_error_e ail_destroy_appinfo(const ail_appinfo_h handle);
+
+ail_error_e ail_destroy_appinfo(ail_appinfo_h ai);
+
+/**
+ * @fn ail_error_e ail_close_appinfo_db(void)
+ *
+ * @brief close appinfo db.
+ *
+ * @par Sync (or) Async : Synchronous API.
+ *
+ * @return 0 if success, negative value(<0) if fail\n
+ * @retval	AIL_ERROR_OK					success
+ * @retval	AIL_ERROR_DB_FAILED				database error
+ * @retval	AIL_ERROR_INVALID_PARAMETER		invalid parameter
+ *
+ * @pre need a handle that you don't need anymore.
+ * @post cannot use the handle after destroying.
+ *
+ * @see  ail_get_appinfo(), ail_appinfo_get_bool(), ail_appinfo_get_int(), ail_appinfo_get_str()
+ *
+ * @par Prospective Clients:
+ * External Apps.
+ *
+ * @code
+static ail_error_e _get_name(const char *appid)
+{
+	ail_appinfo_h handle;
+	ail_error_e ret;
+	char *str;
+
+	ret = ail_get_appinfo(appid, &handle);
+	if (ret != AIL_ERROR_OK) {
+		return AIL_ERROR_FAIL;
+	}
+
+	ret = ail_appinfo_get_str(handle, AIL_PROP_NAME_STR, &str);
+	if (ret != AIL_ERROR_OK) {
+		return AIL_ERROR_FAIL;
+	}
+	fprintf(stderr, "Package[%s], Property[%s] : %s\n", appid, property, str);
+
+	ret = ail_destroy_appinfo(handle);
+	if (ret != AIL_ERROR_OK) {
+		return AIL_ERROR_FAIL;
+	}
+
+	ret = ail_close_appinfo_db();
+	if (ret != AIL_ERROR_OK) {
+		return AIL_ERROR_FAIL;
+	}
+
+	return AIL_ERROR_OK;
+}
+ * @endcode
+ */
+ail_error_e ail_close_appinfo_db(void);
 
 
 /**
- * @fn ail_error_e ail_desktop_add(const char *package)
+ * @fn ail_error_e ail_desktop_add(const char *appid)
  *
- * @brief add a package information into Application Information Database.
-	A desktop file for this package has to be installed in the desktop directory before using this API.
+ * @brief add a app information into Application Information Database.
+	A desktop file for this app has to be installed in the desktop directory before using this API.
 	If there is no database for Application Information Database, this API will create the DB.
-	If there is a DB, this function adds information for the package into the DB.
+	If there is a DB, this function adds information for the app into the DB.
 	And a notification is published to the applications who want to know about changing DB. 
  *
  * @par Sync (or) Async : Synchronous API.
  *
- * @param[in] package package name
+ * @param[in] appid
  *
  * @return 0 if success, negative value(<0) if fail\n
  * @retval	AIL_ERROR_OK					success
  * @retval	AIL_ERROR_FAIL					internal error
  * @retval 	AIL_ERROR_INVALID_PARAMETER		invalid parameter
  *
- * @pre a desktop file for the package has to be installed in the desktop directory before using this API.
- * @post package information is added into the Application Information Database.
+ * @pre a desktop file for the app has to be installed in the desktop directory before using this API.
+ * @post app information is added into the Application Information Database.
  *
  * @see  ail_desktop_update(), ail_desktop_remove()
  *
@@ -983,15 +1043,15 @@ ail_error_e ail_destroy_appinfo(const ail_appinfo_h handle);
  * External Apps.
  *
  * @code
-static ail_error_e _add_desktop(const char *package)
+static ail_error_e _add_desktop(const char *appid)
 {
 	ail_error_e ret;
 
-	if (!package) {
+	if (!appid) {
 		return AIL_ERROR_FAIL;
 	}
 
-	ret = ail_desktop_add(package);
+	ret = ail_desktop_add(appid);
 	if (ret != AIL_ERROR_OK) {
 		return AIL_ERROR_FAIL;
 	}
@@ -1000,28 +1060,28 @@ static ail_error_e _add_desktop(const char *package)
 }
  * @endcode
  */
-ail_error_e ail_desktop_add(const char *package);
+ail_error_e ail_desktop_add(const char *appid);
 
 
 
 /**
- * @fn ail_error_e ail_desktop_update(const char *package)
+ * @fn ail_error_e ail_desktop_update(const char *appid)
  *
- * @brief update a package information in the Application Information Database.
-	A desktop file for this package has to be installed in the desktop directory before using this API.
+ * @brief update a app information in the Application Information Database.
+	A desktop file for this app has to be installed in the desktop directory before using this API.
 	And a notification is published to the applications who want to know about changing DB. 
  *
  * @par Sync (or) Async : Synchronous API.
  *
- * @param[in] package package name
+ * @param[in] appid
  *
  * @return 0 if success, negative value(<0) if fail\n
  * @retval	AIL_ERROR_OK					success
  * @retval	AIL_ERROR_FAIL					internal error
  * @retval 	AIL_ERROR_INVALID_PARAMETER		invalid parameter
  *
- * @pre a desktop file for the package has to be installed in the desktop directory before using this API.
- * @post update a package information in the Application Information Database.
+ * @pre a desktop file for the app has to be installed in the desktop directory before using this API.
+ * @post update a app information in the Application Information Database.
  *
  * @see  ail_desktop_add(), ail_desktop_remove()
  *
@@ -1029,15 +1089,15 @@ ail_error_e ail_desktop_add(const char *package);
  * External Apps.
  *
  * @code
-static ail_error_e _update_desktop(const char *package)
+static ail_error_e _update_desktop(const char *appid)
 {
 	ail_error_e ret;
 
-	if (!package) {
+	if (!appid) {
 		return AIL_ERROR_FAIL;
 	}
 
-	ret = ail_desktop_update(package);
+	ret = ail_desktop_update(appid);
 	if (ret != AIL_ERROR_OK) {
 		return AIL_ERROR_FAIL;
 	}
@@ -1046,19 +1106,19 @@ static ail_error_e _update_desktop(const char *package)
 }
  * @endcode
  */
-ail_error_e ail_desktop_update(const char *package);
+ail_error_e ail_desktop_update(const char *appid);
 
 
 
 /**
- * @fn ail_error_e ail_desktop_remove(const char *package)
+ * @fn ail_error_e ail_desktop_remove(const char *appid)
  *
- * @brief remove a package information in the Application Information Database.
+ * @brief remove a app information in the Application Information Database.
 	And a notification is published to the applications who want to know about changing DB. 
  *
  * @par Sync (or) Async : Synchronous API.
  *
- * @param[in] package package name
+ * @param[in] appid
  *
  * @return 0 if success, negative value(<0) if fail\n
  * @retval	AIL_ERROR_OK					success
@@ -1066,7 +1126,7 @@ ail_error_e ail_desktop_update(const char *package);
  * @retval 	AIL_ERROR_INVALID_PARAMETER		invalid parameter
  *
  * @pre no pre-condition.
- * @post package information is removed in the Application Information Database.
+ * @post app information is removed in the Application Information Database.
  *
  * @see  ail_desktop_add(), ail_desktop_update()
  *
@@ -1074,15 +1134,15 @@ ail_error_e ail_desktop_update(const char *package);
  * External Apps.
  *
  * @code
-static ail_error_e _remove_desktop(const char *package)
+static ail_error_e _remove_desktop(const char *appid)
 {
 	ail_error_e ret;
 
-	if (!package) {
+	if (!appid) {
 		return AIL_ERROR_FAIL;
 	}
 
-	ret = ail_desktop_remove(package);
+	ret = ail_desktop_remove(appid);
 	if (ret != AIL_ERROR_OK) {
 		return AIL_ERROR_FAIL;
 	}
@@ -1091,7 +1151,145 @@ static ail_error_e _remove_desktop(const char *package)
 }
  * @endcode
  */
-ail_error_e ail_desktop_remove(const char *package);
+ail_error_e ail_desktop_remove(const char *appid);
+
+/**
+ * @fn ail_error_e ail_desktop_clean(const char *pkgid)
+ *
+ * @brief clean a pkg information in the Application Information Database.
+ *
+ * @par Sync (or) Async : Synchronous API.
+ *
+ * @param[in] pkgid
+ *
+ * @return 0 if success, negative value(<0) if fail\n
+ * @retval	AIL_ERROR_OK					success
+ * @retval	AIL_ERROR_FAIL					internal error
+ * @retval 	AIL_ERROR_INVALID_PARAMETER		invalid parameter
+ *
+ * @pre no pre-condition.
+ * @post app information is removed in the Application Information Database.
+ *
+ * @see  ail_desktop_add(), ail_desktop_update()
+ *
+ * @par Prospective Clients:
+ * External Apps.
+ *
+ * @code
+static ail_error_e _clean_desktop(const char *pkgid)
+{
+	ail_error_e ret;
+
+	if (!appid) {
+		return AIL_ERROR_FAIL;
+	}
+
+	ret = ail_desktop_clean(pkgid);
+	if (ret != AIL_ERROR_OK) {
+		return AIL_ERROR_FAIL;
+	}
+
+	return AIL_ERROR_OK;
+}
+ * @endcode
+ */
+ail_error_e ail_desktop_clean(const char *pkgid);
+
+
+/**
+ * @fn ail_error_e ail_desktop_fota(const char *appid)
+ *
+ * @brief add a app information into Application Information Database.
+	A desktop file for this app has to be installed in the desktop directory before using this API.
+	If there is no database for Application Information Database, this API will create the DB.
+	If there is a DB, this function adds information for the app into the DB.
+	And a notification is not published to the applications who want to know about changing DB.
+ *
+ * @par Sync (or) Async : Synchronous API.
+ *
+ * @param[in] appid
+ *
+ * @return 0 if success, negative value(<0) if fail\n
+ * @retval	AIL_ERROR_OK					success
+ * @retval	AIL_ERROR_FAIL					internal error
+ * @retval 	AIL_ERROR_INVALID_PARAMETER		invalid parameter
+ *
+ * @pre a desktop file for the app has to be installed in the desktop directory before using this API.
+ * @post app information is added into the Application Information Database.
+ *
+ * @see  ail_desktop_update(), ail_desktop_remove()
+ *
+ * @par Prospective Clients:
+ * External Apps.
+ *
+ * @code
+static ail_error_e _add_desktop_fota(const char *appid)
+{
+	ail_error_e ret;
+
+	if (!appid) {
+		return AIL_ERROR_FAIL;
+	}
+
+	ret = ail_desktop_fota(appid);
+	if (ret != AIL_ERROR_OK) {
+		return AIL_ERROR_FAIL;
+	}
+
+	return AIL_ERROR_OK;
+}
+ * @endcode
+ */
+ail_error_e ail_desktop_fota(const char *appid);
+
+/**
+ * @fn ail_error_e ail_desktop_appinfo_modify_str(const char *appid, const char *property, const char *value, bool broadcast)
+ *
+ * @brief update a app information db.
+	And a notification is published to the applications who want to know about changing DB.
+ *
+ * @par Sync (or) Async : Synchronous API.
+ *
+ * @param[in] appid
+ *
+ * @return 0 if success, negative value(<0) if fail\n
+ * @retval	AIL_ERROR_OK					success
+ * @retval	AIL_ERROR_FAIL					internal error
+ * @retval 	AIL_ERROR_INVALID_PARAMETER		invalid parameter
+ *
+ * @pre no pre-condition.
+ * @post app information is removed in the Application Information Database.
+ *
+ *
+ * @par Prospective Clients:
+ * External Apps.
+ *
+ * @code
+static ail_error_e _appinfo_modify_str(const char *appid, const char *property, const char *value, bool broadcast)
+{
+	ail_error_e ret;
+
+	if (!appid) {
+		return AIL_ERROR_FAIL;
+	}
+	if (!property) {
+		return AIL_ERROR_FAIL;
+	}
+	if (!value) {
+		return AIL_ERROR_FAIL;
+	}
+
+	ret = ail_desktop_appinfo_modify_str(appid, property, value, broadcast);
+	if (ret != AIL_ERROR_OK) {
+		return AIL_ERROR_FAIL;
+	}
+
+	return AIL_ERROR_OK;
+}
+ * @endcode
+ */
+
+ail_error_e ail_desktop_appinfo_modify_str(const char *appid, const char *property, const char *value, bool broadcast);
 
 /** @} */
 

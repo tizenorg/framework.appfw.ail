@@ -36,7 +36,9 @@
 
 #include "ail_private.h"
 #include "ail_db.h"
+#include "ail_sql.h"
 #include "ail.h"
+#include "ail_convert.h"
 
 #define OPT_DESKTOP_DIRECTORY "/opt/share/applications"
 #define USR_DESKTOP_DIRECTORY "/usr/share/applications"
@@ -100,6 +102,10 @@ typedef struct {
 	char*		x_slp_svc;
 	char*		x_slp_exe_path;
 	char*		x_slp_appid;
+	char*		x_slp_pkgid;
+	char*		x_slp_domain;
+	char*		x_slp_submodemainid;
+	char*		x_slp_installedstorage;
 	int		x_slp_baselayoutwidth;
 	int		x_slp_installedtime;
 	int		nodisplay;
@@ -107,7 +113,8 @@ typedef struct {
 	int		x_slp_multiple;
 	int		x_slp_removable;
 	int		x_slp_ishorizontalscale;
-	int		x_slp_inactivated;
+	int		x_slp_enabled;
+	int		x_slp_submode;
 	char*		desktop;
 	GSList*		localname;
 } desktop_info_s;
@@ -134,13 +141,14 @@ static ail_error_e _read_exec(void *data, char *tag, char *value)
 	}
 
 	token_exe_path = strtok_r(temp_exec, argsdelimiter, &save_ptr);
-
-	info->x_slp_exe_path = strdup(token_exe_path);
-	if(!info->x_slp_exe_path) {
-		free(info->exec);
-		info->exec = NULL;
-		free(temp_exec);
-		return AIL_ERROR_OUT_OF_MEMORY;
+	if (token_exe_path) {
+		info->x_slp_exe_path = strdup(token_exe_path);
+		if(!info->x_slp_exe_path) {
+			free(info->exec);
+			info->exec = NULL;
+			free(temp_exec);
+			return AIL_ERROR_OUT_OF_MEMORY;
+		}
 	}
 
 	free(temp_exec);
@@ -240,6 +248,8 @@ _get_icon_with_path(char* icon)
 		package = _get_package_from_icon(icon);
 		retv_if(!package, NULL);
 
+/* "db/setting/theme" is not exist */
+#if 0
 		theme = vconf_get_str("db/setting/theme");
 		if (!theme) {
 			theme = strdup("default");
@@ -248,6 +258,13 @@ _get_icon_with_path(char* icon)
 				return NULL;
 			}
 		}
+#else
+		theme = strdup("default");
+		if (!theme) {
+			free(package);
+			return NULL;
+		}
+#endif
 
 		len = (0x01 << 7) + strlen(icon) + strlen(package) + strlen(theme);
 		icon_with_path = malloc(len);
@@ -260,27 +277,27 @@ _get_icon_with_path(char* icon)
 
 		memset(icon_with_path, 0, len);
 
-		snprintf(icon_with_path, len, "/opt/share/icons/%s/small/%s", theme, icon);
+		sqlite3_snprintf( len, icon_with_path,"/opt/share/icons/%q/small/%q", theme, icon);
 		do {
 			if (access(icon_with_path, R_OK) == 0) break;
-			snprintf(icon_with_path, len, "/usr/share/icons/%s/small/%s", theme, icon);
+			sqlite3_snprintf( len, icon_with_path,"/usr/share/icons/%q/small/%q", theme, icon);
 			if (access(icon_with_path, R_OK) == 0) break;
 			_D("cannot find icon %s", icon_with_path);
-			snprintf(icon_with_path, len, "/opt/share/icons/default/small/%s", icon);
+			sqlite3_snprintf( len, icon_with_path, "/opt/share/icons/default/small/%q", icon);
 			if (access(icon_with_path, R_OK) == 0) break;
-			snprintf(icon_with_path, len, "/usr/share/icons/default/small/%s", icon);
+			sqlite3_snprintf( len, icon_with_path, "/usr/share/icons/default/small/%q", icon);
 			if (access(icon_with_path, R_OK) == 0) break;
 
 			#if 1 /* this will be remove when finish the work for moving icon path */
 			_E("icon file must be moved to %s", icon_with_path);
-			snprintf(icon_with_path, len, "/opt/apps/%s/res/icons/%s/small/%s", package, theme, icon);
+			sqlite3_snprintf( len, icon_with_path,  "/opt/apps/%q/res/icons/%q/small/%q", package, theme, icon);
 			if (access(icon_with_path, R_OK) == 0) break;
-			snprintf(icon_with_path, len, "/usr/apps/%s/res/icons/%s/small/%s", package, theme, icon);
+			sqlite3_snprintf( len, icon_with_path, "/usr/apps/%q/res/icons/%q/small/%q", package, theme, icon);
 			if (access(icon_with_path, R_OK) == 0) break;
 			_D("cannot find icon %s", icon_with_path);
-			snprintf(icon_with_path, len, "/opt/apps/%s/res/icons/default/small/%s", package, icon);
+			sqlite3_snprintf( len, icon_with_path, "/opt/apps/%q/res/icons/default/small/%q", package, icon);
 			if (access(icon_with_path, R_OK) == 0) break;
-			snprintf(icon_with_path, len, "/usr/apps/%s/res/icons/default/small/%s", package, icon);
+			sqlite3_snprintf( len, icon_with_path, "/usr/apps/%q/res/icons/default/small/%q", package, icon);
 			if (access(icon_with_path, R_OK) == 0) break;
 			#endif
 		} while (0);
@@ -351,7 +368,10 @@ static ail_error_e _read_mimetype(void *data, char *tag, char *value)
 {
 	desktop_info_s *info = data;
 	int size, total_len = 0;
-	char *mimes_origin, *mimes_changed, *token_unalias, *save_ptr;
+	char *mimes_origin = NULL;
+	char *mimes_changed = NULL;
+	char *token_unalias = NULL;
+	char *save_ptr = NULL;
 
 	retv_if(!data, AIL_ERROR_INVALID_PARAMETER);
 	retv_if(!value, AIL_ERROR_INVALID_PARAMETER);
@@ -387,6 +407,10 @@ static ail_error_e _read_mimetype(void *data, char *tag, char *value)
 			tmp = realloc(mimes_changed, size);
 			if(!tmp) {
 				free(mimes_changed);
+
+				if (mimes_origin)
+					free(mimes_origin);
+
 				return AIL_ERROR_OUT_OF_MEMORY;
 			}
 			mimes_changed = tmp;
@@ -403,6 +427,9 @@ static ail_error_e _read_mimetype(void *data, char *tag, char *value)
 
 	SAFE_FREE(info->mimetype);
 	info->mimetype = mimes_changed;
+
+	if (mimes_origin)
+		free(mimes_origin);
 
 	return AIL_ERROR_OK;
 }
@@ -481,7 +508,31 @@ static ail_error_e _read_x_slp_packageid(void *data, char *tag, char *value)
 	return AIL_ERROR_OK;
 }
 
+static ail_error_e _read_x_slp_submodemainid(void *data, char *tag, char *value)
+{
+	desktop_info_s *info = data;
 
+	retv_if(!data, AIL_ERROR_INVALID_PARAMETER);
+	retv_if(!value, AIL_ERROR_INVALID_PARAMETER);
+
+	SAFE_FREE_AND_STRDUP(value, info->x_slp_submodemainid);
+	retv_if(!info->x_slp_submodemainid, AIL_ERROR_OUT_OF_MEMORY);
+
+	return AIL_ERROR_OK;
+}
+
+static ail_error_e _read_x_slp_installedstorage(void *data, char *tag, char *value)
+{
+	desktop_info_s *info = data;
+
+	retv_if(!data, AIL_ERROR_INVALID_PARAMETER);
+	retv_if(!value, AIL_ERROR_INVALID_PARAMETER);
+
+	SAFE_FREE_AND_STRDUP(value, info->x_slp_installedstorage);
+	retv_if(!info->x_slp_installedstorage, AIL_ERROR_OUT_OF_MEMORY);
+
+	return AIL_ERROR_OK;
+}
 
 static ail_error_e _read_x_slp_uri(void *data, char *tag, char *value)
 {
@@ -554,6 +605,18 @@ static ail_error_e _read_x_slp_removable(void *data, char *tag, char *value)
 }
 
 
+static ail_error_e _read_x_slp_submode(void *data, char *tag, char *value)
+{
+	desktop_info_s *info = data;
+
+	retv_if(!data, AIL_ERROR_INVALID_PARAMETER);
+	retv_if(!value, AIL_ERROR_INVALID_PARAMETER);
+
+	info->x_slp_submode = !strcasecmp(value, "true");
+
+	return AIL_ERROR_OK;
+}
+
 static ail_error_e _read_x_slp_appid(void *data, char *tag, char *value)
 {
 	desktop_info_s *info = data;
@@ -566,6 +629,48 @@ static ail_error_e _read_x_slp_appid(void *data, char *tag, char *value)
 
 	return AIL_ERROR_OK;
 }
+
+
+static ail_error_e _read_x_slp_pkgid(void *data, char *tag, char *value)
+{
+	desktop_info_s *info = data;
+
+	retv_if(!data, AIL_ERROR_INVALID_PARAMETER);
+	retv_if(!value, AIL_ERROR_INVALID_PARAMETER);
+
+	SAFE_FREE_AND_STRDUP(value, info->x_slp_pkgid);
+	retv_if(!info->x_slp_pkgid, AIL_ERROR_OUT_OF_MEMORY);
+
+	return AIL_ERROR_OK;
+}
+
+
+static ail_error_e _read_x_slp_domain(void *data, char *tag, char *value)
+{
+	desktop_info_s *info = data;
+
+	retv_if(!data, AIL_ERROR_INVALID_PARAMETER);
+	retv_if(!value, AIL_ERROR_INVALID_PARAMETER);
+
+	SAFE_FREE_AND_STRDUP(value, info->x_slp_domain);
+	retv_if(!info->x_slp_appid, AIL_ERROR_OUT_OF_MEMORY);
+
+	return AIL_ERROR_OK;
+}
+
+
+static ail_error_e _read_x_slp_enabled(void *data, char *tag, char *value)
+{
+	desktop_info_s *info = data;
+
+	retv_if(!data, AIL_ERROR_INVALID_PARAMETER);
+	retv_if(!value, AIL_ERROR_INVALID_PARAMETER);
+
+	info->x_slp_enabled = !strcasecmp(value, "true");
+
+	return AIL_ERROR_OK;
+}
+
 
 static struct entry_parser entry_parsers[] = {
 	{
@@ -613,6 +718,14 @@ static struct entry_parser entry_parsers[] = {
 		.value_cb = _read_x_slp_packageid,
 	},
 	{
+		.field = "x-tizen-submodemainid",
+		.value_cb = _read_x_slp_submodemainid,
+	},
+	{
+		.field = "x-tizen-installedstorage",
+		.value_cb = _read_x_slp_installedstorage,
+	},
+	{
 		.field = "x-tizen-uri",
 		.value_cb = _read_x_slp_uri,
 	},
@@ -629,6 +742,14 @@ static struct entry_parser entry_parsers[] = {
 		.value_cb = _read_x_slp_taskmanage,
 	},
 	{
+		.field = "x-tizen-enabled",
+		.value_cb = _read_x_slp_enabled,
+	},
+	{
+		.field = "x-tizen-submode",
+		.value_cb = _read_x_slp_submode,
+	},
+	{
 		.field = "x-tizen-multiple",
 		.value_cb = _read_x_slp_multiple,
 	},
@@ -639,6 +760,18 @@ static struct entry_parser entry_parsers[] = {
 	{
 		.field = "x-tizen-appid",
 		.value_cb = _read_x_slp_appid,
+	},
+	{
+		.field = "x-tizen-pkgid",
+		.value_cb = _read_x_slp_pkgid,
+	},
+	{
+		.field = "x-tizen-domain",
+		.value_cb = _read_x_slp_domain,
+	},
+	{
+		.field = "x-tizen-enabled",
+		.value_cb = _read_x_slp_domain,
 	},
 	{
 		.field = NULL,
@@ -713,6 +846,8 @@ static inline int _strlen_desktop_info(desktop_info_s* info)
 	if (info->x_slp_exe_path) len += strlen(info->x_slp_exe_path);
 	if (info->x_slp_appid) len += strlen(info->x_slp_appid);
 	if (info->desktop) len += strlen(info->desktop);
+	if (info->x_slp_submodemainid) len += strlen(info->x_slp_submodemainid);
+	if (info->x_slp_installedstorage) len += strlen(info->x_slp_installedstorage);
 
 	return len;
 }
@@ -744,6 +879,7 @@ static ail_error_e _init_desktop_info(desktop_info_s *info, const char *package)
 
 	info->x_slp_taskmanage = 1;
 	info->x_slp_removable = 1;
+	info->x_slp_submode = 0;
 
 	if(is_initdb)
 		info->x_slp_installedtime = 0;
@@ -761,6 +897,8 @@ static ail_error_e _init_desktop_info(desktop_info_s *info, const char *package)
 	retv_if(!info->x_slp_packageid, AIL_ERROR_OUT_OF_MEMORY);
 	info->x_slp_appid = strdup(package);
 	retv_if(!info->x_slp_appid, AIL_ERROR_OUT_OF_MEMORY);
+
+	info->x_slp_enabled = 1;
 
 	info->desktop = _pkgname_to_desktop(package);
 	retv_if(!info->desktop, AIL_ERROR_FAIL);
@@ -797,7 +935,7 @@ static ail_error_e _read_desktop_info(desktop_info_s* info)
 		tag = calloc(1, len);
 		value = calloc(1, len);
 
-		if (!field || !field || !tag || !value) {
+		if (!field || !field_name || !tag || !value) {
 			goto NEXT;
 		}
 
@@ -812,7 +950,7 @@ static ail_error_e _read_desktop_info(desktop_info_s* info)
 		}
 
 		for (idx = 0; entry_parsers[idx].field; idx ++) {
-			if (!strcasecmp(entry_parsers[idx].field, field_name) && entry_parsers[idx].value_cb) {
+			if (!g_ascii_strcasecmp(entry_parsers[idx].field, field_name) && entry_parsers[idx].value_cb) {
 				if (entry_parsers[idx].value_cb(info, tag, tmp) != AIL_ERROR_OK) {
 					_E("field - [%s] is wrong.", field_name);
 				}
@@ -833,13 +971,124 @@ NEXT:
 }
 
 
+static ail_error_e _retrieve_all_column_to_desktop_info(desktop_info_s* info, sqlite3_stmt *stmt)
+{
+	int i, j;
+	ail_error_e err;
+	char **values;
+	char *col;
+
+	retv_if(!info, AIL_ERROR_INVALID_PARAMETER);
+
+	values = calloc(NUM_OF_PROP, sizeof(char *));
+	retv_if(!values, AIL_ERROR_OUT_OF_MEMORY);
+
+	for (i = 0; i < NUM_OF_PROP; i++) {
+		err = db_column_str(stmt, i, &col);
+		if (AIL_ERROR_OK != err)
+			break;
+
+		if (!col) {
+			values[i] = AIL_EMPTY_STR;
+		} else {
+			values[i] = strdup(col);
+			if (!values[i]) {
+				err = AIL_ERROR_OUT_OF_MEMORY;
+				goto NEXT;
+			}
+		}
+	}
+
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_EXEC_STR], info->exec);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_NAME_STR], info->name);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_TYPE_STR], info->type);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_ICON_STR], info->icon);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_CATEGORIES_STR], info->categories);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_VERSION_STR], info->version);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_MIMETYPE_STR], info->mimetype);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_SERVICE_STR], info->x_slp_service);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_PACKAGETYPE_STR], info->x_slp_packagetype);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_PACKAGECATEGORIES_STR], info->x_slp_packagecategories);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_PACKAGEID_STR], info->x_slp_packageid);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_URI_STR], info->x_slp_uri);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_SVC_STR], info->x_slp_svc);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_EXE_PATH], info->x_slp_exe_path);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_APPID_STR], info->x_slp_appid);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_PKGID_STR], info->x_slp_pkgid);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_DOMAIN_STR], info->x_slp_domain);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_SUBMODEMAINID_STR], info->x_slp_submodemainid);
+	SAFE_FREE_AND_STRDUP(values[E_AIL_PROP_X_SLP_INSTALLEDSTORAGE_STR], info->x_slp_installedstorage);
+
+	info->x_slp_installedtime = atoi(values[E_AIL_PROP_X_SLP_INSTALLEDTIME_INT]);
+
+	info->nodisplay = atoi(values[E_AIL_PROP_NODISPLAY_BOOL]);
+	info->x_slp_taskmanage = atoi(values[E_AIL_PROP_X_SLP_TASKMANAGE_BOOL]);
+	info->x_slp_multiple = atoi(values[E_AIL_PROP_X_SLP_MULTIPLE_BOOL]);
+	info->x_slp_removable = atoi(values[E_AIL_PROP_X_SLP_REMOVABLE_BOOL]);
+	info->x_slp_ishorizontalscale = atoi(values[E_AIL_PROP_X_SLP_ISHORIZONTALSCALE_BOOL]);
+	info->x_slp_enabled = atoi(values[E_AIL_PROP_X_SLP_ENABLED_BOOL]);
+	info->x_slp_submode = atoi(values[E_AIL_PROP_X_SLP_SUBMODE_BOOL]);
+
+	err = AIL_ERROR_OK;
+
+NEXT:
+	for (j = 0; j < i; ++j) {
+		if (strcmp(values[j], AIL_EMPTY_STR) != 0)
+			free(values[j]);
+	}
+	if (values)
+		free(values);
+	return err;
+}
+
+
+static ail_error_e _load_desktop_info(desktop_info_s* info)
+{
+	ail_error_e ret;
+	char query[AIL_SQL_QUERY_MAX_LEN];
+	sqlite3_stmt *stmt = NULL;
+
+	retv_if(!info, AIL_ERROR_INVALID_PARAMETER);
+
+	char *w = sqlite3_mprintf("app_info.X_SLP_APPID=%Q", info->package);
+
+	snprintf(query, sizeof(query), "SELECT %s FROM %s WHERE %s",SQL_FLD_APP_INFO, SQL_TBL_APP_INFO, w);
+
+	do {
+		ret = db_open(DB_OPEN_RO);
+		if (ret < 0) break;
+
+		ret = db_prepare(query, &stmt);
+		if (ret < 0) break;
+
+		ret = db_step(stmt);
+		if (ret < 0) {
+			db_finalize(stmt);
+			break;
+		}
+
+		ret = _retrieve_all_column_to_desktop_info(info, stmt);
+		if (ret < 0) {
+			db_finalize(stmt);
+			break;
+		}
+
+		ret = db_finalize(stmt);
+		if (ret < 0) break;
+
+		ret = AIL_ERROR_OK;
+		break;
+	} while(0);
+
+	sqlite3_free(w);
+	return ret;
+}
 
 static ail_error_e _modify_desktop_info_bool(desktop_info_s* info,
 						  const char *property,
 						  bool value)
 {
 	ail_prop_bool_e prop;
-	int val;
 
 	retv_if(!info, AIL_ERROR_INVALID_PARAMETER);
 	retv_if(!property, AIL_ERROR_INVALID_PARAMETER);
@@ -850,8 +1099,8 @@ static ail_error_e _modify_desktop_info_bool(desktop_info_s* info,
 		return AIL_ERROR_INVALID_PARAMETER;
 
 	switch (prop) {
-		case E_AIL_PROP_X_SLP_INACTIVATED_BOOL:
-			info->x_slp_inactivated = (int)value;
+		case E_AIL_PROP_X_SLP_ENABLED_BOOL:
+			info->x_slp_enabled = (int)value;
 			break;
 		default:
 			return AIL_ERROR_FAIL;
@@ -859,6 +1108,43 @@ static ail_error_e _modify_desktop_info_bool(desktop_info_s* info,
 
 	return AIL_ERROR_OK;
 }
+
+
+static ail_error_e _modify_desktop_info_str(desktop_info_s* info,
+						  const char *property,
+						  const char *value)
+{
+	ail_prop_str_e prop;
+
+	retv_if(!info, AIL_ERROR_INVALID_PARAMETER);
+	retv_if(!property, AIL_ERROR_INVALID_PARAMETER);
+
+	prop = _ail_convert_to_prop_str(property);
+
+	if (prop < E_AIL_PROP_STR_MIN || prop > E_AIL_PROP_STR_MAX)
+		return AIL_ERROR_INVALID_PARAMETER;
+
+	switch (prop) {
+		case E_AIL_PROP_NAME_STR:
+			SAFE_FREE_AND_STRDUP(value, info->name);
+			retv_if (!info->name, AIL_ERROR_OUT_OF_MEMORY);
+			break;
+		case E_AIL_PROP_X_SLP_SVC_STR:
+			SAFE_FREE_AND_STRDUP(value, info->x_slp_svc);
+			retv_if (!info->x_slp_svc, AIL_ERROR_OUT_OF_MEMORY);
+			break;
+		case E_AIL_PROP_X_SLP_INSTALLEDSTORAGE_STR:
+			SAFE_FREE_AND_STRDUP(value, info->x_slp_installedstorage);
+			retv_if (!info->x_slp_installedstorage, AIL_ERROR_OUT_OF_MEMORY);
+			break;
+		default:
+			_E("prop[%d] is not defined\n", prop);
+			return AIL_ERROR_FAIL;
+	}
+
+	return AIL_ERROR_OK;
+}
+
 
 
 
@@ -884,6 +1170,10 @@ static ail_error_e _create_table(void)
 		"x_slp_svc TEXT, "
 		"x_slp_exe_path TEXT, "
 		"x_slp_appid TEXT, "
+		"x_slp_pkgid TEXT, "
+		"x_slp_domain TEXT, "
+		"x_slp_submodemainid TEXT, "
+		"x_slp_installedstorage TEXT, "
 		"x_slp_baselayoutwidth INTEGER DEFAULT 0, "
 		"x_slp_installedtime INTEGER DEFAULT 0, "
 		"nodisplay INTEGER DEFAULT 0, "
@@ -891,11 +1181,14 @@ static ail_error_e _create_table(void)
 		"x_slp_multiple INTEGER DEFAULT 0, "
 		"x_slp_removable INTEGER DEFAULT 1, "
 		"x_slp_ishorizontalscale INTEGER DEFAULT 0, "
-		"x_slp_inactivated INTEGER DEFAULT 0, "
+		"x_slp_enabled INTEGER DEFAULT 1, "
+		"x_slp_submode INTEGER DEFAULT 0, "
 		"desktop TEXT UNIQUE NOT NULL);",
 		"CREATE TABLE localname (package TEXT NOT NULL, "
 		"locale TEXT NOT NULL, "
-		"name TEXT NOT NULL, PRIMARY KEY (package, locale));",
+		"name TEXT NOT NULL, "
+		"x_slp_pkgid TEXT NOT NULL, PRIMARY KEY (package, locale));",
+
 		NULL
 	};
 
@@ -913,29 +1206,25 @@ static ail_error_e _create_table(void)
 
 static inline void _insert_localname(gpointer data, gpointer user_data)
 {
-	char query[512];
-
 	struct name_item *item = (struct name_item *)data;
 	desktop_info_s *info = (desktop_info_s *)user_data;
 
-	snprintf(query, sizeof(query), "insert into localname (package, locale, name) "
-			"values ('%s', '%s', '%s');", 
-			info->package, item->locale, item->name);
+	char *query = sqlite3_mprintf("insert into localname (package, locale, name, x_slp_pkgid) "
+			"values (%Q, %Q, %Q, %Q);",
+			info->package, item->locale, item->name, info->x_slp_pkgid);
+
 	if (db_exec(query) < 0)
 		_E("Failed to insert local name of package[%s]",info->package);
+
+	sqlite3_free(query);
 }
 
 static ail_error_e _insert_desktop_info(desktop_info_s *info)
 {
-	char *query;
-	int len;
 	ail_error_e ret;
 
-	len = _strlen_desktop_info(info) + (0x01 << 10);
-	query = calloc(1, len);
-	retv_if(!query, AIL_ERROR_OUT_OF_MEMORY);
 
-	snprintf(query, len, "insert into app_info ("
+	char *query = sqlite3_mprintf("insert into app_info ("
 		"package, "
 		"exec, name, "
 		"type, "
@@ -951,6 +1240,10 @@ static ail_error_e _insert_desktop_info(desktop_info_s *info)
 		"x_slp_svc, "
 		"x_slp_exe_path, "
 		"x_slp_appid, "
+		"x_slp_pkgid, "
+		"x_slp_domain, "
+		"x_slp_submodemainid, "
+		"x_slp_installedstorage, "
 		"x_slp_baselayoutwidth, "
 		"x_slp_installedtime, "
 		"nodisplay, "
@@ -958,15 +1251,17 @@ static ail_error_e _insert_desktop_info(desktop_info_s *info)
 		"x_slp_multiple, "
 		"x_slp_removable, "
 		"x_slp_ishorizontalscale, "
-		"x_slp_inactivated, "
+		"x_slp_enabled, "
+		"x_slp_submode, "
 		"desktop) "
 		"values "
-		"('%s', '%s', '%s', '%s', '%s', "
-		"'%s', '%s', '%s', '%s', '%s', "
-		"'%s', '%s', '%s', '%s', '%s', '%s', "
-		"%d, %d, %d, %d, %d, %d, "
+		"(%Q, %Q, %Q, %Q, %Q, "
+		"%Q, %Q, %Q, %Q, %Q, "
+		"%Q, %Q, %Q, %Q, %Q, "
+		"%Q, %Q, %Q, %Q, %Q, "
+		"%d, %d, %d, %d, %d, %d, %d,"
 		"%d, %d, "
-		"'%s');",
+		"%Q);",
 		info->package,
 		info->exec,
 		info->name,
@@ -983,6 +1278,10 @@ static ail_error_e _insert_desktop_info(desktop_info_s *info)
 		info->x_slp_svc,
 		info->x_slp_exe_path,
 		info->x_slp_appid,
+		info->x_slp_pkgid,
+		info->x_slp_domain,
+		info->x_slp_submodemainid,
+		info->x_slp_installedstorage,
 		info->x_slp_baselayoutwidth,
 		info->x_slp_installedtime,
 		info->nodisplay,
@@ -990,24 +1289,30 @@ static ail_error_e _insert_desktop_info(desktop_info_s *info)
 		info->x_slp_multiple,
 		info->x_slp_removable,
 		info->x_slp_ishorizontalscale,
-		info->x_slp_inactivated,
+		info->x_slp_enabled,
+		info->x_slp_submode,
 		info->desktop
 		);
 
 	ret = db_open(DB_OPEN_RW);
 	if(ret != AIL_ERROR_OK) {
 		_E("(tmp == NULL) return\n");
-		free(query);
+		sqlite3_free(query);
 		return AIL_ERROR_DB_FAILED;
 	}
 
 	ret = db_exec(query);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_DB_FAILED);
+	if(ret != AIL_ERROR_OK) {
+		_E("db_exec fail\n");
+		sqlite3_free(query);
+		return AIL_ERROR_DB_FAILED;
+	}
 
 	if (info->localname)
 		g_slist_foreach(info->localname, _insert_localname, info);
 
 	_D("Add (%s).", info->package);
+	sqlite3_free(query);
 
 	return AIL_ERROR_OK;
 }
@@ -1016,35 +1321,35 @@ static ail_error_e _insert_desktop_info(desktop_info_s *info)
 
 static ail_error_e _update_desktop_info(desktop_info_s *info)
 {
-	char *query;
-	int len;
 
 	retv_if (NULL == info, AIL_ERROR_INVALID_PARAMETER);
 
 	if (db_open(DB_OPEN_RW) < 0) {
+		_E("db_open fail\n");
 		return AIL_ERROR_DB_FAILED;
 	}
 
-	len = _strlen_desktop_info(info) + (0x01 << 10);
-	query = calloc(1, len);
-	retv_if(!query, AIL_ERROR_OUT_OF_MEMORY);
 
-	snprintf (query, len, "update app_info set "
-		"exec='%s', "
-		"name='%s', "
-		"type='%s', "
-		"icon='%s', "
-		"categories='%s', "
-		"version='%s', "
-		"mimetype='%s', "
-		"x_slp_service='%s', "
-		"x_slp_packagetype='%s', "
-		"x_slp_packagecategories='%s', "
-		"x_slp_packageid='%s', "
-		"x_slp_uri='%s', "
-		"x_slp_svc='%s', "
-		"x_slp_exe_path='%s', "
-		"x_slp_appid='%s', "
+	char *query = sqlite3_mprintf("update app_info set "
+		"exec=%Q, "
+		"name=%Q, "
+		"type=%Q, "
+		"icon=%Q, "
+		"categories=%Q, "
+		"version=%Q, "
+		"mimetype=%Q, "
+		"x_slp_service=%Q, "
+		"x_slp_packagetype=%Q, "
+		"x_slp_packagecategories=%Q, "
+		"x_slp_packageid=%Q, "
+		"x_slp_uri=%Q, "
+		"x_slp_svc=%Q, "
+		"x_slp_exe_path=%Q, "
+		"x_slp_appid=%Q, "
+		"x_slp_pkgid=%Q, "
+		"x_slp_domain=%Q, "
+		"x_slp_submodemainid=%Q, "
+		"x_slp_installedstorage=%Q, "
 		"x_slp_baselayoutwidth=%d, "
 		"x_slp_installedtime=%d, "
 		"nodisplay=%d, "
@@ -1052,9 +1357,10 @@ static ail_error_e _update_desktop_info(desktop_info_s *info)
 		"x_slp_multiple=%d, "
 		"x_slp_removable=%d, "
 		"x_slp_ishorizontalscale=%d, "
-		"x_slp_inactivated=%d, "
-		"desktop='%s'"
-		"where package='%s'",
+		"x_slp_enabled=%d, "
+		"x_slp_submode=%d, "
+		"desktop=%Q"
+		"where package=%Q",
 		info->exec,
 		info->name,
 		info->type,
@@ -1070,6 +1376,10 @@ static ail_error_e _update_desktop_info(desktop_info_s *info)
 		info->x_slp_svc,
 		info->x_slp_exe_path,
 		info->x_slp_appid,
+		info->x_slp_pkgid,
+		info->x_slp_domain,
+		info->x_slp_submodemainid,
+		info->x_slp_installedstorage,
 		info->x_slp_baselayoutwidth,
 		info->x_slp_installedtime,
 		info->nodisplay,
@@ -1077,19 +1387,22 @@ static ail_error_e _update_desktop_info(desktop_info_s *info)
 		info->x_slp_multiple,
 		info->x_slp_removable,
 		info->x_slp_ishorizontalscale,
-		info->x_slp_inactivated,
+		info->x_slp_enabled,
+		info->x_slp_submode,
 		info->desktop,
 		info->package);
 
 	if (db_exec(query) < 0) {
-		free (query);
+		_E("db_exec fail\n");
+		sqlite3_free(query);
 		return AIL_ERROR_DB_FAILED;
 	}
 
-	snprintf(query, len, "delete from localname where package = '%s'", info->package);
-
+	sqlite3_free(query);
+	query = sqlite3_mprintf("delete from localname where package = %Q", info->package);
 	if (db_exec(query) < 0) {
-		free (query);
+		_E("db_exec fail\n");
+		sqlite3_free(query);
 		return AIL_ERROR_DB_FAILED;
 	}
 
@@ -1098,7 +1411,7 @@ static ail_error_e _update_desktop_info(desktop_info_s *info)
 
 	_D("Update (%s).", info->package);
 
-	free(query);
+	sqlite3_free(query);
 
 	return AIL_ERROR_OK;
 }
@@ -1107,8 +1420,7 @@ static ail_error_e _update_desktop_info(desktop_info_s *info)
 
 static ail_error_e _remove_package(const char* package)
 {
-	char *query;
-	int size;
+	char *query = NULL;
 
 	retv_if(!package, AIL_ERROR_INVALID_PARAMETER);
 
@@ -1116,31 +1428,63 @@ static ail_error_e _remove_package(const char* package)
 		return AIL_ERROR_DB_FAILED;
 	}
 
-	size = strlen(package) + (0x01 << 10);
-	query = calloc(1, size);
-	retv_if(!query, AIL_ERROR_OUT_OF_MEMORY);
 
-	snprintf(query, size, "delete from app_info where package = '%s'", package);
+	query = sqlite3_mprintf("delete from app_info where package = %Q", package);
 
 	if (db_exec(query) < 0) {
-		free(query);
+		_E("db_exec fail\n");
+		sqlite3_free(query);
 		return AIL_ERROR_DB_FAILED;
 	}
+	sqlite3_free(query);
 
-	snprintf(query, size, "delete from localname where package = '%s'", package);
-	_D("query=%s",query);
+	query = sqlite3_mprintf("delete from localname where package = %Q", package);
+//	_D("query=%s",query);
 
 	if (db_exec(query) < 0) {
-		free(query);
+		_E("db_exec fail\n");
+		sqlite3_free(query);
 		return AIL_ERROR_DB_FAILED;
 	}
 
 	_D("Remove (%s).", package);
-	free(query);
+	sqlite3_free(query);
 
 	return AIL_ERROR_OK;
 }
 
+static ail_error_e _clean_pkgid_data(const char* pkgid)
+{
+	char *query = NULL;
+
+	retv_if(!pkgid, AIL_ERROR_INVALID_PARAMETER);
+
+	if (db_open(DB_OPEN_RW) < 0) {
+		return AIL_ERROR_DB_FAILED;
+	}
+
+
+	query = sqlite3_mprintf("delete from app_info where x_slp_pkgid = %Q", pkgid);
+	if (db_exec(query) < 0) {
+		sqlite3_free(query);
+		return AIL_ERROR_DB_FAILED;
+	}
+	sqlite3_free(query);
+
+	query = sqlite3_mprintf("delete from localname where x_slp_pkgid = %Q", pkgid);
+//	_D("query=%s",query);
+
+	if (db_exec(query) < 0) {
+		_E("db_exec fail\n");
+		sqlite3_free(query);
+		return AIL_ERROR_DB_FAILED;
+	}
+
+	_D("Clean pkgid data (%s).", pkgid);
+	sqlite3_free(query);
+
+	return AIL_ERROR_OK;
+}
 
 
 static ail_error_e _send_db_done_noti(noti_type type, const char *package)
@@ -1169,7 +1513,8 @@ static ail_error_e _send_db_done_noti(noti_type type, const char *package)
 	retv_if(!noti_string, AIL_ERROR_OUT_OF_MEMORY);
 
 	snprintf(noti_string, size, "%s:%s", type_string, package);
-	vconf_set_str("memory/menuscreen/desktop", noti_string);
+	vconf_set_str(VCONFKEY_AIL_INFO_STATE, noti_string);
+	vconf_set_str(VCONFKEY_MENUSCREEN_DESKTOP, noti_string); // duplicate, will be removed
 	_D("Noti : %s", noti_string);
 
 	free(noti_string);
@@ -1207,6 +1552,10 @@ static void _fini_desktop_info(desktop_info_s *info)
 	SAFE_FREE(info->x_slp_svc);
 	SAFE_FREE(info->x_slp_exe_path);
 	SAFE_FREE(info->x_slp_appid);
+	SAFE_FREE(info->x_slp_pkgid);
+	SAFE_FREE(info->x_slp_domain);
+	SAFE_FREE(info->x_slp_submodemainid);
+	SAFE_FREE(info->x_slp_installedstorage);
 	SAFE_FREE(info->desktop);
 	if (info->localname) {
 		g_slist_free_full(info->localname, _name_item_free_func);
@@ -1216,16 +1565,155 @@ static void _fini_desktop_info(desktop_info_s *info)
 	return;
 }
 
+static int __is_authorized()
+{
+	uid_t uid = getuid();
+	if ((uid_t) 0 == uid )
+		return 1;
+	else
+		return 0;
+}
 
 
 /* Public functions */
-EXPORT_API ail_error_e ail_desktop_add(const char *package)
+EXPORT_API ail_error_e ail_desktop_add(const char *appid)
+{
+	desktop_info_s info = {0,};
+	ail_error_e ret = AIL_ERROR_OK;
+	int count = 0;
+
+	retv_if(!appid, AIL_ERROR_INVALID_PARAMETER);
+	if (!__is_authorized()) {
+		_E("You are not an authorized user on adding!\n");
+		return -1;
+	}
+
+	count = _count_all();
+	if (count >= 0) {
+		ret = _create_table();
+		if (ret != AIL_ERROR_OK) {
+			_D("Cannot create a table. Maybe there is already a table.");
+		}
+	}
+
+	ret = _init_desktop_info(&info, appid);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
+
+	ret = _read_desktop_info(&info);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
+
+	ret = _insert_desktop_info(&info);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
+
+	ret = _send_db_done_noti(NOTI_ADD, appid);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
+
+err_check:
+	_fini_desktop_info(&info);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+
+	return AIL_ERROR_OK;
+}
+
+
+
+EXPORT_API ail_error_e ail_desktop_update(const char *appid)
+{
+	desktop_info_s info = {0,};
+	ail_error_e ret = AIL_ERROR_OK;
+
+	retv_if(!appid, AIL_ERROR_INVALID_PARAMETER);
+	if (!__is_authorized()) {
+		_E("You are not an authorized user on updating!\n");
+		return -1;
+	}
+
+	ret = _init_desktop_info(&info, appid);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
+
+	ret = _read_desktop_info(&info);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
+
+	ret = _update_desktop_info(&info);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
+
+	ret = _send_db_done_noti(NOTI_UPDATE, appid);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
+
+err_check:
+	_fini_desktop_info(&info);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+
+	return AIL_ERROR_OK;
+}
+
+
+
+EXPORT_API ail_error_e ail_desktop_remove(const char *appid)
+{
+	ail_error_e ret;
+
+	retv_if(!appid, AIL_ERROR_INVALID_PARAMETER);
+	if (!__is_authorized()) {
+		_E("You are not an authorized user on removing!\n");
+		return -1;
+	}
+
+	ret = _remove_package(appid);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+
+	ret = _send_db_done_noti(NOTI_REMOVE, appid);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+
+	return AIL_ERROR_OK;
+}
+
+EXPORT_API ail_error_e ail_desktop_clean(const char *pkgid)
+{
+	ail_error_e ret;
+
+	retv_if(!pkgid, AIL_ERROR_INVALID_PARAMETER);
+	if (!__is_authorized()) {
+		_E("You are not an authorized user on removing!\n");
+		return -1;
+	}
+
+	_D("ail_desktop_clean=%s",pkgid);
+
+	ret = _clean_pkgid_data(pkgid);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+
+	return AIL_ERROR_OK;
+}
+
+
+EXPORT_API ail_error_e ail_desktop_fota(const char *appid)
 {
 	desktop_info_s info = {0,};
 	ail_error_e ret;
 	int count;
 
-	retv_if(!package, AIL_ERROR_INVALID_PARAMETER);
+	retv_if(!appid, AIL_ERROR_INVALID_PARAMETER);
+	if (!__is_authorized()) {
+		_E("You are not an authorized user on adding!\n");
+		return -1;
+	}
 
 	count = _count_all();
 	if (count <= 0) {
@@ -1235,98 +1723,104 @@ EXPORT_API ail_error_e ail_desktop_add(const char *package)
 		}
 	}
 
-	ret = _init_desktop_info(&info, package);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	ret = _init_desktop_info(&info, appid);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _read_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _insert_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
-	ret = _send_db_done_noti(NOTI_ADD, package);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
-
+err_check:
 	_fini_desktop_info(&info);
-
-	return AIL_ERROR_OK;
-}
-
-
-
-EXPORT_API ail_error_e ail_desktop_update(const char *package)
-{
-	desktop_info_s info = {0,};
-	ail_error_e ret;
-
-	retv_if(!package, AIL_ERROR_INVALID_PARAMETER);
-
-	ret = _init_desktop_info(&info, package);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
-
-	ret = _read_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
-
-	ret = _update_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
-
-	ret = _send_db_done_noti(NOTI_UPDATE, package);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
-
-	_fini_desktop_info(&info);
-
-	return AIL_ERROR_OK;
-}
-
-
-
-EXPORT_API ail_error_e ail_desktop_remove(const char *package)
-{
-	ail_error_e ret;
-
-	retv_if(!package, AIL_ERROR_INVALID_PARAMETER);
-
-	ret = _remove_package(package);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
-
-	ret = _send_db_done_noti(NOTI_REMOVE, package);
 	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
 
 	return AIL_ERROR_OK;
 }
 
-
-EXPORT_API ail_error_e ail_desktop_appinfo_modify_bool(const char *package,
+EXPORT_API ail_error_e ail_desktop_appinfo_modify_bool(const char *appid,
 							     const char *property,
-							     bool value)
+							     bool value,
+							     bool broadcast)
 {
 	desktop_info_s info = {0,};
 	ail_error_e ret;
-	ail_prop_bool_e prop;
 
-	retv_if(!package, AIL_ERROR_INVALID_PARAMETER);
+	retv_if(!appid, AIL_ERROR_INVALID_PARAMETER);
 
-	retv_if(strcmp(property, AIL_PROP_X_SLP_INACTIVATED_BOOL),
+	retv_if(strcmp(property, AIL_PROP_X_SLP_ENABLED_BOOL),
 		AIL_ERROR_INVALID_PARAMETER);
 
-	ret = _init_desktop_info(&info, package);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	ret = _init_desktop_info(&info, appid);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
+
+	ret = _load_desktop_info(&info);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _modify_desktop_info_bool(&info, property, value);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
 	ret = _update_desktop_info(&info);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if(ret != AIL_ERROR_OK) {
+		goto err_check;
+	}
 
-	ret = _send_db_done_noti(NOTI_UPDATE, package);
-	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
+	if (broadcast) {
+		ret = _send_db_done_noti(NOTI_UPDATE, appid);
+		if(ret != AIL_ERROR_OK) {
+			goto err_check;
+		}
+	}
 
+err_check:
 	_fini_desktop_info(&info);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_FAIL);
 
 	return AIL_ERROR_OK;
 }
 
 
+EXPORT_API ail_error_e ail_desktop_appinfo_modify_str(const char *appid,
+							     const char *property,
+							     const char *value,
+							     bool broadcast)
+{
+	retv_if(!appid, AIL_ERROR_INVALID_PARAMETER);
 
+	ail_error_e ret = 0;
+	sqlite3_stmt *stmt = NULL;
+	sqlite3 *appinfo_db = NULL;
+
+	_D("appinfo_modify_str : %s,  %s", appid, value);
+
+	ret = db_util_open(PKGMGR_PARSER_DB, &appinfo_db, 0);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_DB_FAILED);
+
+	char *query = sqlite3_mprintf("delete from package_app_app_control where app_id=%Q", appid);
+	ret = sqlite3_exec(appinfo_db, query, NULL, NULL, NULL);
+	sqlite3_free(query);
+
+	query = sqlite3_mprintf("insert into package_app_app_control(app_id, app_control) values('%s', '%s')", appid, value);
+	ret = sqlite3_exec(appinfo_db, query, NULL, NULL, NULL);
+	sqlite3_free(query);
+	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_DB_FAILED);
+
+	sqlite3_close(appinfo_db);
+
+	return AIL_ERROR_OK;
+}
 
 // End of File

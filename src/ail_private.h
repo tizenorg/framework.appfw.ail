@@ -37,13 +37,15 @@
 
 #if 1
 #include <dlog.h>
-#define _E(fmt, arg...) LOGE("[%s,%d] "fmt,__FUNCTION__,__LINE__,##arg)
-#define _D(fmt, arg...) LOGD("[%s,%d] "fmt,__FUNCTION__,__LINE__,##arg)
+#define _E(fmt, arg...) LOGE(fmt,##arg)
+#define _D(fmt, arg...) LOGD(fmt,##arg)
 #else
 #include <stdio.h>
 #define _E(fmt, arg...) fprintf(stderr, "[%s,%d] "fmt,__FUNCTION__,__LINE__,##arg)
 #define _D(fmt, arg...) fprintf(stderr, "[%s,%d] "fmt,__FUNCTION__,__LINE__,##arg)
 #endif
+
+#define AIL_EMPTY_STR		""
 
 #define retv_if(expr, val) do { \
 	if(expr) { \
@@ -92,6 +94,7 @@ enum {
 
 #define AIL_SQL_QUERY_MAX_LEN	2048
 #define APP_INFO_DB "/opt/dbspace/.app_info.db"
+#define PKGMGR_PARSER_DB "/opt/dbspace/.pkgmgr_parser.db"
 
 #define ELEMENT_TYPE(e, t) do { \
 	if(e->prop >= E_AIL_PROP_STR_MIN && e->prop <= E_AIL_PROP_STR_MAX) t= (int)VAL_TYPE_STR; \
@@ -130,7 +133,11 @@ typedef enum {
 	E_AIL_PROP_X_SLP_SVC_STR,
 	E_AIL_PROP_X_SLP_EXE_PATH,
 	E_AIL_PROP_X_SLP_APPID_STR,
-	E_AIL_PROP_STR_MAX = E_AIL_PROP_X_SLP_APPID_STR,
+	E_AIL_PROP_X_SLP_PKGID_STR,
+	E_AIL_PROP_X_SLP_DOMAIN_STR,
+	E_AIL_PROP_X_SLP_SUBMODEMAINID_STR,
+	E_AIL_PROP_X_SLP_INSTALLEDSTORAGE_STR,
+	E_AIL_PROP_STR_MAX = E_AIL_PROP_X_SLP_INSTALLEDSTORAGE_STR,
 } ail_prop_str_e;
 
 
@@ -155,8 +162,9 @@ typedef enum {
 	E_AIL_PROP_X_SLP_MULTIPLE_BOOL,
 	E_AIL_PROP_X_SLP_REMOVABLE_BOOL,
 	E_AIL_PROP_X_SLP_ISHORIZONTALSCALE_BOOL,
-	E_AIL_PROP_X_SLP_INACTIVATED_BOOL,
-	E_AIL_PROP_BOOL_MAX = E_AIL_PROP_X_SLP_INACTIVATED_BOOL,
+	E_AIL_PROP_X_SLP_ENABLED_BOOL,
+	E_AIL_PROP_X_SLP_SUBMODE_BOOL,
+	E_AIL_PROP_BOOL_MAX = E_AIL_PROP_X_SLP_SUBMODE_BOOL,
 } ail_prop_bool_e;
 
 #define NUM_OF_PROP E_AIL_PROP_BOOL_MAX + 1

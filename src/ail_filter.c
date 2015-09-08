@@ -25,6 +25,7 @@
 #include <glib.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 #include "ail.h"
 #include "ail_private.h"
 #include "ail_convert.h"
@@ -86,6 +87,7 @@ EXPORT_API ail_error_e ail_filter_destroy(ail_filter_h filter)
 	}
 
 	free(filter);
+	db_close();
 
 	return AIL_ERROR_OK;
 }
@@ -173,23 +175,32 @@ EXPORT_API ail_error_e ail_filter_add_str(ail_filter_h filter, const char *prope
 static void _get_condition(gpointer data, char **condition)
 {
 	struct element *e = (struct element *)data;
-	const char *f;
-	char buf[AIL_SQL_QUERY_MAX_LEN];
+	const char *f = NULL;
+	char buf[AIL_SQL_QUERY_MAX_LEN] = {0};
+	char *b_value = NULL;
+	int t = 0;
 
 	f =  sql_get_filter(e->prop);
-	int t;
+	if (!f)
+		return;
+
 	ELEMENT_TYPE(e, t);
 
 	switch (t) {
 		case VAL_TYPE_BOOL:
-			snprintf(buf, sizeof(buf), f, ELEMENT_BOOL(e)->value);
+			if(ELEMENT_BOOL(e)->value)
+				b_value = strdup("true");
+			else
+				b_value = strdup("false");
+
+			snprintf(buf, sizeof(buf), f, b_value);
 			break;
 		case VAL_TYPE_INT:
 			snprintf(buf, sizeof(buf), f, ELEMENT_INT(e)->value);
 			break;
 		case VAL_TYPE_STR:
 			if (E_AIL_PROP_NAME_STR == e->prop) {
-				snprintf(buf, sizeof(buf), f, ELEMENT_STR(e)->value, ELEMENT_STR(e)->value);
+				snprintf(buf, sizeof(buf), f, ELEMENT_STR(e)->value);
 			} else {
 				snprintf(buf, sizeof(buf), f, ELEMENT_STR(e)->value);
 			}
@@ -199,6 +210,8 @@ static void _get_condition(gpointer data, char **condition)
 			*condition = NULL;
 			return;
 	}
+	if(b_value)
+		free(b_value);
 
 	*condition = strdup(buf);
 
@@ -207,12 +220,12 @@ static void _get_condition(gpointer data, char **condition)
 
 char *_get_where_clause(ail_filter_h filter)
 {
-	char *c;
+	char *c = NULL;
 	char w[AIL_SQL_QUERY_MAX_LEN] = {0,};
 	c = NULL;
 
 	GSList *l;
-	
+
 	snprintf(w, AIL_SQL_QUERY_MAX_LEN, " WHERE ");
 
 	for (l = filter->list; l; l = g_slist_next(l)) {
@@ -225,7 +238,10 @@ char *_get_where_clause(ail_filter_h filter)
 
 		strncat(w, c, sizeof(w)-strlen(w)-1);
 		w[sizeof(w)-1] = '\0';
-		if(c) free(c);
+		if (c) {
+			free(c);
+			c = NULL;
+		}
 
 		if (g_slist_next(l)) {
 			strncat(w, " and ", sizeof(w)-strlen(w)-1);
@@ -233,27 +249,26 @@ char *_get_where_clause(ail_filter_h filter)
 		}
 	}
 
-	_D("where = %s", w);
-
 	return strdup(w);
 }
 
 EXPORT_API ail_error_e ail_filter_count_appinfo(ail_filter_h filter, int *cnt)
 {
-	char q[AIL_SQL_QUERY_MAX_LEN];
-	char *w;
-	char *tmp_q;
-	char *l;
-	int r;
-	int n;
-	sqlite3_stmt *stmt;
+	char q[AIL_SQL_QUERY_MAX_LEN] = {0};
+	char *w = NULL;
+	char *tmp_q = NULL;
+	char *l = NULL;
+	sqlite3_stmt *stmt = NULL;
+	ail_appinfo_h ai = NULL;
+	int filter_count = 0;
+	char *locale = NULL;
 
 	retv_if(!cnt, AIL_ERROR_INVALID_PARAMETER);
 
-	if (db_open(DB_OPEN_RO) != AIL_ERROR_OK)
+	if (db_open_pkg_mgr(DB_OPEN_RO) != AIL_ERROR_OK)
 		return AIL_ERROR_DB_FAILED;
 
-	snprintf(q, sizeof(q), "SELECT COUNT (*) FROM %s", SQL_TBL_APP_INFO_WITH_LOCALNAME);
+	snprintf(q, sizeof(q), "SELECT * FROM (SELECT %s FROM %s)", SQL_FLD_PKG_APP_INFO_FILTER, SQL_TBL_APP_INFO_FILTER);
 
 	tmp_q = strdup(q);
 	retv_if (NULL == tmp_q, AIL_ERROR_OUT_OF_MEMORY);
@@ -263,53 +278,79 @@ EXPORT_API ail_error_e ail_filter_count_appinfo(ail_filter_h filter, int *cnt)
 		free(tmp_q);
 		return AIL_ERROR_FAIL;
 	}
-	snprintf(q, sizeof(q), tmp_q, l);
+	locale = (char*) calloc(strlen(l)+1,1);
+	if(locale == NULL) {
+		free(tmp_q);
+		free(l);
+		return AIL_ERROR_OUT_OF_MEMORY;
+	}
+	strncpy(locale ,l, 2);
+	strncat(locale,"-",1);
+	locale[3] = tolower(l[3]);
+	locale[4] = tolower(l[4]);
 	free(l);
+
+	snprintf(q, sizeof(q), tmp_q, locale);
+	free(locale);
 	free(tmp_q);
 
-	if (filter && filter->list) { 
+	if (filter && filter->list) {
 		w = _get_where_clause(filter);
 		retv_if (NULL == w, AIL_ERROR_FAIL);
+
 		strncat(q, w, sizeof(q)-strlen(q)-1);
 		q[sizeof(q)-1] = '\0';
 		free(w);
 	}
-
-	_D("Query = %s",q);
+	else
+		_D("No filter exists. All records are retreived");
 
 	if (db_prepare(q, &stmt) != AIL_ERROR_OK) {
+		_E("db_prepare fail for query = %s",q);
 		return AIL_ERROR_DB_FAILED;
 	}
 
-	r = db_step(stmt);
-	if (r == AIL_ERROR_OK) {
-		db_column_int(stmt, 0, &n);
-		*cnt = n;
+	ai = appinfo_create();
+	if (ai == NULL) {
+		_E("failed to create appinfo");
+		db_finalize(stmt);
+		return AIL_ERROR_OUT_OF_MEMORY;
+	}
+
+	appinfo_set_stmt(ai, stmt);
+
+	while (db_step(stmt) == AIL_ERROR_OK) {
+		if(_appinfo_check_installed_storage(ai) != AIL_ERROR_OK)
+			continue;
+
+		filter_count++;
 	}
 
 	db_finalize(stmt);
 
-	return r;
+	appinfo_destroy(ai);
+	*cnt = filter_count;
+
+	return AIL_ERROR_OK;
 }
-
-
 
 EXPORT_API ail_error_e ail_filter_list_appinfo_foreach(ail_filter_h filter, ail_list_appinfo_cb cb, void *user_data)
 {
-	char q[AIL_SQL_QUERY_MAX_LEN];
-	char *tmp_q;
-	char *w;
-	char *l;
+	char q[AIL_SQL_QUERY_MAX_LEN] = {0};
+	char *tmp_q = NULL;
+	char *w = NULL;
+	char *l = NULL;
 	ail_cb_ret_e r;
-	sqlite3_stmt *stmt;
-	ail_appinfo_h ai;
+	sqlite3_stmt *stmt = NULL;
+	ail_appinfo_h ai = NULL;
+	char *locale = NULL;
 
 	retv_if (NULL == cb, AIL_ERROR_INVALID_PARAMETER);
 
-	if (db_open(DB_OPEN_RO) != AIL_ERROR_OK)
+	if (db_open_pkg_mgr(DB_OPEN_RO) != AIL_ERROR_OK)
 		return AIL_ERROR_DB_FAILED;
 
-	snprintf(q, sizeof(q), "SELECT %s FROM %s", SQL_FLD_APP_INFO_WITH_LOCALNAME, SQL_TBL_APP_INFO_WITH_LOCALNAME);
+	snprintf(q, sizeof(q), "SELECT * FROM (SELECT %s FROM %s)", SQL_FLD_PKG_APP_INFO_FILTER, SQL_TBL_APP_INFO_FILTER);
 
 	tmp_q = strdup(q);
 	retv_if (NULL == tmp_q, AIL_ERROR_OUT_OF_MEMORY);
@@ -319,8 +360,21 @@ EXPORT_API ail_error_e ail_filter_list_appinfo_foreach(ail_filter_h filter, ail_
 		free(tmp_q);
 		return AIL_ERROR_FAIL;
 	}
-	snprintf(q, sizeof(q), tmp_q, l);
+
+	locale = (char*) calloc(strlen(l)+1,1);
+	if(locale == NULL) {
+		free(tmp_q);
+		free(l);
+		return AIL_ERROR_OUT_OF_MEMORY;
+	}
+	strncpy(locale ,l, 2);
+	strncat(locale,"-",1);
+	locale[3] = tolower(l[3]);
+	locale[4] = tolower(l[4]);
 	free(l);
+
+	snprintf(q, sizeof(q), tmp_q, locale);
+	free(locale);
 	free(tmp_q);
 
 	if (filter && filter->list) {
@@ -328,32 +382,30 @@ EXPORT_API ail_error_e ail_filter_list_appinfo_foreach(ail_filter_h filter, ail_
 		retv_if (NULL == w, AIL_ERROR_FAIL);
 		strncat(q, w, sizeof(q)-strlen(q)-1);
 		q[sizeof(q)-1] = '\0';
-		strncat(q, " order by app_info.package", sizeof(q)-strlen(q)-1);
-		q[sizeof(q)-1] = '\0';
 		free(w);
 	}
 	else
 		_D("No filter exists. All records are retreived");
 
-	_D("Query = %s",q);
-
 	if (db_prepare(q, &stmt) != AIL_ERROR_OK) {
+		_E("db_prepare fail for query = %s",q);
 		return AIL_ERROR_DB_FAILED;
 	}
 
 	ai = appinfo_create();
+	if (ai == NULL)
+		return AIL_ERROR_OUT_OF_MEMORY;
 
 	appinfo_set_stmt(ai, stmt);
 	while (db_step(stmt) == AIL_ERROR_OK) {
+		if(_appinfo_check_installed_storage(ai) != AIL_ERROR_OK)
+			continue;
 
 		r = cb(ai, user_data);
 		if (AIL_CB_RET_CANCEL == r)
 			break;
 	}
-	appinfo_destroy(ai);
-
 	db_finalize(stmt);
-
+	appinfo_destroy(ai);
 	return AIL_ERROR_OK;
 }
-

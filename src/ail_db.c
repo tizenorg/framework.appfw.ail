@@ -21,7 +21,7 @@
 
 
 
-
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <db-util.h>
@@ -31,8 +31,14 @@
 
 #define retv_with_dbmsg_if(expr, val) do { \
 	if (expr) { \
-		_E("db_info.dbro: %s", sqlite3_errmsg(db_info.dbro)); \
-		_E("db_info.dbrw: %s", sqlite3_errmsg(db_info.dbrw)); \
+		if (access(APP_INFO_DB, R_OK) == 0) { \
+			_E("db_info.dbro: %s", sqlite3_errmsg(db_info.dbro)); \
+			_E("db_info.dbrw: %s", sqlite3_errmsg(db_info.dbrw)); \
+			_E("db_info.dbro errcode: %d", sqlite3_extended_errcode(db_info.dbro)); \
+			_E("db_info.dbrw errcode: %d", sqlite3_extended_errcode(db_info.dbrw)); \
+		} else { \
+			_E("db_info.db can not access by smack"); \
+		} \
 		return (val); \
 	} \
 } while (0)
@@ -48,21 +54,40 @@ static __thread struct {
 
 ail_error_e db_open(db_open_mode mode)
 {
-	int ret;
-	int changed = 0;
+	int ret = AIL_ERROR_OK;
 
 	if(mode & DB_OPEN_RO) {
 		if (!db_info.dbro) {
-			ret = db_util_open_with_options(APP_INFO_DB, &db_info.dbro, SQLITE_OPEN_READONLY, NULL);
-			_E("db_open_ro ret=%d", ret);
+			ret = db_util_open(APP_INFO_DB, &db_info.dbro, 0);
 			retv_with_dbmsg_if(ret != SQLITE_OK, AIL_ERROR_DB_FAILED);
 		}
 	}
 
 	if(mode & DB_OPEN_RW) {
 		if (!db_info.dbrw) {
-			ret = db_util_open(APP_INFO_DB, &db_info.dbrw, DB_UTIL_REGISTER_HOOK_METHOD);
-			_E("db_open_rw ret=%d", ret);
+			ret = db_util_open(APP_INFO_DB, &db_info.dbrw, 0);
+			retv_with_dbmsg_if(ret != SQLITE_OK, AIL_ERROR_DB_FAILED);
+		}
+	}
+
+	return AIL_ERROR_OK;
+}
+
+
+ail_error_e db_open_pkg_mgr(db_open_mode mode)
+{
+	int ret = AIL_ERROR_OK;
+
+	if(mode & DB_OPEN_RO) {
+		if (!db_info.dbro) {
+			ret = db_util_open(PKGMGR_PARSER_DB, &db_info.dbro, 0);
+			retv_with_dbmsg_if(ret != SQLITE_OK, AIL_ERROR_DB_FAILED);
+		}
+	}
+
+	if(mode & DB_OPEN_RW) {
+		if (!db_info.dbrw) {
+			ret = db_util_open(PKGMGR_PARSER_DB, &db_info.dbrw, 0);
 			retv_with_dbmsg_if(ret != SQLITE_OK, AIL_ERROR_DB_FAILED);
 		}
 	}
@@ -83,8 +108,9 @@ ail_error_e db_prepare(const char *query, sqlite3_stmt **stmt)
 	ret = sqlite3_prepare_v2(db_info.dbro, query, strlen(query), stmt, NULL);
 	if (ret != SQLITE_OK) {
 		_E("%s\n", sqlite3_errmsg(db_info.dbro));
+		_E("%d\n", sqlite3_extended_errcode(db_info.dbro));
 		return AIL_ERROR_DB_FAILED;
-	} else 
+	} else
 		return AIL_ERROR_OK;
 }
 
@@ -215,8 +241,8 @@ ail_error_e db_exec(const char *query)
 
 	ret = sqlite3_exec(db_info.dbrw, query, NULL, NULL, &errmsg);
 	if (ret != SQLITE_OK) {
-		_E("Cannot execute this query - %s. because %s",
-				query, errmsg? errmsg:"uncatched error");
+		_E("Cannot execute because %s", errmsg? errmsg:"uncatched error");
+		_E("query - %s", query);
 		sqlite3_free(errmsg);
 		return AIL_ERROR_DB_FAILED;
 	}
@@ -251,5 +277,18 @@ EXPORT_API ail_error_e ail_db_close(void)
 	return db_close();
 }
 
+int db_exec_sqlite_query(char *query, sqlite_query_callback callback, void *data)
+{
+	char *error_message = NULL;
+	if (SQLITE_OK !=
+	    sqlite3_exec(db_info.dbro, query, callback, data, &error_message)) {
+		_E("Don't execute query = %s error message = %s\n", query,
+		       error_message);
+		sqlite3_free(error_message);
+		return -1;
+	}
+	sqlite3_free(error_message);
+	return 0;
+}
 
 // End of file.

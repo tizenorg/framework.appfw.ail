@@ -1,7 +1,7 @@
 #sbs-git:slp/pkgs/a/ail ail 0.2.22 29ac1f2c98453cad647cca6a92abc7da3dbb047b
 Name:       ail
 Summary:    Application Information Library
-Version:    0.2.44
+Version:    0.2.95
 Release:    1
 Group:      System/Libraries
 License:    Apache License, Version 2.0
@@ -15,7 +15,6 @@ BuildRequires:  pkgconfig(dlog)
 BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(db-util)
 BuildRequires:  pkgconfig(xdgmime)
-
 
 %description
 Application Information Library
@@ -33,15 +32,26 @@ Application Information Library (devel)
 
 %build
 CFLAGS+=" -fpic"
-cmake . -DCMAKE_INSTALL_PREFIX=%{_prefix} -DBUILD_PKGTYPE=rpm
+
+%if 0%{?tizen_build_binary_release_type_eng}
+export CFLAGS="$CFLAGS -DTIZEN_ENGINEER_MODE"
+export CXXFLAGS="$CXXFLAGS ?DTIZEN_ENGINEER_MODE"
+export FFLAGS="$FFLAGS -DTIZEN_ENGINEER_MODE"
+%endif
+
+%cmake .  -DBUILD_PKGTYPE=rpm
 
 make %{?jobs:-j%jobs}
 
 %install
-rm -rf %{buildroot}
 %make_install
 
+mkdir -p %{buildroot}/usr/share/license
+cp LICENSE %{buildroot}/usr/share/license/%{name}
+
 %post
+vconftool set -t string db/ail/ail_info "0" -f -s system::vconf_inhouse
+vconftool set -t string db/menuscreen/desktop "0" -f -s system::vconf_inhouse
 
 CHDBGID="6010"
 
@@ -60,20 +70,28 @@ update_DAC_for_db_file()
                 echo "Failed to change the perms of $@"
         fi
 }
+mkdir -p /usr/share/applications
+mkdir -p /opt/share/applications
 mkdir -p /opt/dbspace/
-ail_initdb
+
 update_DAC_for_db_file /opt/dbspace/.app_info.db
 update_DAC_for_db_file /opt/dbspace/.app_info.db-journal
 
 %postun
 
 %files
-/usr/lib/libail.so.0
-/usr/lib/libail.so.0.1.0
+%manifest ail.manifest
+%{_libdir}/libail.so.0
+%{_libdir}/libail.so.0.1.0
 /usr/bin/ail_initdb
+/usr/bin/ail_desktop
+/usr/bin/ail_filter
+/usr/bin/ail_test
+/usr/bin/ail_package
 /usr/share/install-info/*
+/usr/share/license/%{name}
 
 %files devel
 /usr/include/ail.h
-/usr/lib/libail.so
-/usr/lib/pkgconfig/ail.pc
+%{_libdir}/libail.so
+%{_libdir}/pkgconfig/ail.pc
