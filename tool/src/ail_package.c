@@ -71,7 +71,7 @@ static void _print_help(const char *cmd)
 	}
 
 	fprintf(stderr, "\n");
-	fprintf(stderr, "       Ex) %s get com.samsung.menu-screen X_SLP_SERVICE\n", cmd);
+	fprintf(stderr, "       Ex) %s get org.tizen.menu-screen X_SLP_SERVICE\n", cmd);
 	fprintf(stderr, "\n");
 }
 

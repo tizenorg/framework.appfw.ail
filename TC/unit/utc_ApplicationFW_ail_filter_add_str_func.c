@@ -83,7 +83,7 @@ static void utc_ApplicationFW_ail_filter_add_str_func_01(void)
 		return;
 	}
 	r = ail_filter_add_str(filter, AIL_PROP_PACKAGE_STR,
-			       "com.samsung.memo");
+			       "org.tizen.memo");
 	if (r != AIL_ERROR_OK) {
 		tet_infoline
 		    ("ail_filter_add_str() failed in positive test case");
@@ -107,7 +107,7 @@ static void utc_ApplicationFW_ail_filter_add_str_func_02(void)
 		tet_result(TET_UNINITIATED);
 		return;
 	}
-	r = ail_filter_add_str(filter, prop, "com.samsung.memo");
+	r = ail_filter_add_str(filter, prop, "org.tizen.memo");
 	if (r != AIL_ERROR_INVALID_PARAMETER) {
 		tet_infoline
 		    ("ail_filter_add_str() failed in negative test case");
@@ -131,7 +131,7 @@ static void utc_ApplicationFW_ail_filter_add_str_func_03(void)
 		tet_result(TET_UNINITIATED);
 		return;
 	}
-	r = ail_filter_add_str(filter, prop, "com.samsung.memo");
+	r = ail_filter_add_str(filter, prop, "org.tizen.memo");
 	if (r != AIL_ERROR_INVALID_PARAMETER) {
 		tet_infoline
 		    ("ail_filter_add_str() failed in negative test case");
@@ -154,7 +154,7 @@ static void utc_ApplicationFW_ail_filter_add_str_func_04(void)
 		tet_result(TET_UNINITIATED);
 		return;
 	}
-	r = ail_filter_add_str(NULL, AIL_PROP_PACKAGE_STR, "com.samsung.memo");
+	r = ail_filter_add_str(NULL, AIL_PROP_PACKAGE_STR, "org.tizen.memo");
 	if (r != AIL_ERROR_INVALID_PARAMETER) {
 		tet_infoline
 		    ("ail_filter_add_str() failed in negative test case");

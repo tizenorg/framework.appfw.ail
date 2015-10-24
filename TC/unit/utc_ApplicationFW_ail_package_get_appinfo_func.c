@@ -80,7 +80,7 @@ static void utc_ApplicationFW_ail_package_get_appinfo_func_01(void)
 {
 	ail_error_e r;
 	ail_appinfo_h handle;
-	r = ail_package_get_appinfo("com.samsung.calculator", &handle);
+	r = ail_package_get_appinfo("org.tizen.calculator", &handle);
 	if (r != AIL_ERROR_OK) {
 		tet_infoline
 		    ("ail_package_get_appinfo() failed in positive test case");
@@ -114,7 +114,7 @@ static void utc_ApplicationFW_ail_package_get_appinfo_func_02(void)
 static void utc_ApplicationFW_ail_package_get_appinfo_func_03(void)
 {
 	ail_error_e r;
-	r = ail_package_get_appinfo("com.samsung.calculator", NULL);
+	r = ail_package_get_appinfo("org.tizen.calculator", NULL);
 	if (r != AIL_ERROR_INVALID_PARAMETER) {
 		tet_infoline
 		    ("ail_package_get_appinfo() failed in negative test case");

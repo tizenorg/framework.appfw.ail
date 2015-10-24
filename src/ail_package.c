@@ -153,21 +153,21 @@ char* _get_mimetype_from_package_app_app_svc(const char *appid)
 	char *mime = NULL;
 
 	char *query = sqlite3_mprintf("select package_app_app_svc.mime_type from package_app_app_svc where package_app_app_svc.app_id=%Q", appid);
-	if (NULL == query){
+	if (NULL == query) {
 		_E("Memory allocation failed");
 		return NULL;
 	}
 	retv_if (db_prepare(query, &stmt) < 0, NULL);
 
-	while (db_step(stmt) == AIL_ERROR_OK){
+	while (db_step(stmt) == AIL_ERROR_OK) {
 		val = (char*)sqlite3_column_text(stmt, col);
 
 		if (!strlen(val) )
 			continue;
 
-		strcat(tmp_mime, val);
-		if(strlen(tmp_mime))
-			strcat(tmp_mime, del);
+		strncat(tmp_mime, val, MAX_SIZE - strlen(tmp_mime));
+		if (strlen(tmp_mime))
+			strncat(tmp_mime, del, MAX_SIZE - strlen(tmp_mime));
 	}
 
 	len = strlen(tmp_mime);
@@ -176,17 +176,17 @@ char* _get_mimetype_from_package_app_app_svc(const char *appid)
 
 	db_finalize(stmt);
 	sqlite3_free(query);
-	if(len >0){
+	if (len > 0) {
 		mime = strdup(tmp_mime);
-		if(NULL == mime){
+		if (mime == NULL) {
 			_E("Memory Allocation Failed");
 			return NULL;
-		}else{
+		} else {
 			return mime;
 		}
-	}else{
-		return NULL;
 	}
+
+	return NULL;
 }
 
 
@@ -281,7 +281,7 @@ static char* __convert_syslocale_to_manifest_locale(char *syslocale)
 		return NULL;
 	}
 
-	sprintf(locale, "%c%c-%c%c", syslocale[0], syslocale[1], tolower(syslocale[3]), tolower(syslocale[4]));
+	snprintf(locale, 6, "%c%c-%c%c", syslocale[0], syslocale[1], tolower(syslocale[3]), tolower(syslocale[4]));
 	return locale;
 }
 
@@ -409,6 +409,9 @@ int _appinfo_check_installed_storage(ail_appinfo_h ai)
 
 void appinfo_set_stmt(ail_appinfo_h ai, sqlite3_stmt *stmt)
 {
+	if (ai == NULL)
+		return;
+
 	ai->stmt = stmt;
 }
 
@@ -599,29 +602,31 @@ static ail_error_e __ail_get_appinfo_new_mimetype(const char *appid, ail_appinfo
 
 	appinfo_set_stmt(ai, stmt);
 
-	if(ai->values[E_AIL_PROP_MIMETYPE_STR]){
+	if (ai->values[E_AIL_PROP_MIMETYPE_STR]){
 		free((void*)ai->values[E_AIL_PROP_MIMETYPE_STR]);
 		ai->values[E_AIL_PROP_MIMETYPE_STR] = NULL;
 	}
-	ai->values[E_AIL_PROP_MIMETYPE_STR] = (char*) calloc(MAX_SIZE,1);
-	if (NULL == ai->values[E_AIL_PROP_MIMETYPE_STR]){
+
+	ai->values[E_AIL_PROP_MIMETYPE_STR] = (char*) calloc(MAX_SIZE, 1);
+	if (NULL == ai->values[E_AIL_PROP_MIMETYPE_STR]) {
 		_E("Memory allocation failed");
 		ret = AIL_ERROR_OUT_OF_MEMORY;
 		goto end;
 	}
 
-	while (db_step(stmt) == AIL_ERROR_OK){
+	while (db_step(stmt) == AIL_ERROR_OK) {
 		val = (char*)sqlite3_column_text(stmt, col);
 
-		if (!strlen(val) )
+		if (!strlen(val))
 			continue;
 
-		strcat(ai->values[E_AIL_PROP_MIMETYPE_STR], val);
-		if(strlen(ai->values[E_AIL_PROP_MIMETYPE_STR]))
-		strcat(ai->values[E_AIL_PROP_MIMETYPE_STR], del);
+		strncat(ai->values[E_AIL_PROP_MIMETYPE_STR], val, MAX_SIZE - strlen(ai->values[E_AIL_PROP_MIMETYPE_STR]));
+
+		if (strlen(ai->values[E_AIL_PROP_MIMETYPE_STR]))
+			strncat(ai->values[E_AIL_PROP_MIMETYPE_STR], del, MAX_SIZE - strlen(ai->values[E_AIL_PROP_MIMETYPE_STR]));
 	}
 
-	if (db_finalize(ai->stmt) != AIL_ERROR_OK){
+	if (db_finalize(ai->stmt) != AIL_ERROR_OK) {
 		ret =  AIL_ERROR_DB_FAILED;
 		goto end;
 	}
@@ -629,6 +634,7 @@ static ail_error_e __ail_get_appinfo_new_mimetype(const char *appid, ail_appinfo
 end:
 	(ai)->stmt = NULL;
 	sqlite3_free(w);
+
 	return ret;
 }
 
@@ -696,18 +702,13 @@ EXPORT_API ail_error_e ail_get_appinfo(const char *appid, ail_appinfo_h *ai)
 	}else{
 		if (!(strcmp((*ai)->values[E_AIL_PROP_ICON_STR], "(NULL)"))){
 			ret = __ail_get_appinfo_new_icon(appid, *ai);
-			if (ret != AIL_ERROR_OK) {
+			if(ret != AIL_ERROR_OK)
 				_E("icon not retrieved");
-				appinfo_destroy(*ai);
-				return ret;
-			}
 		}
 
 		ret = __ail_get_appinfo_new_mimetype(appid, *ai);
-		if (ret != AIL_ERROR_OK) {
+		if(ret != AIL_ERROR_OK)
 			_E("Mimetype not retrieved");
-			appinfo_destroy(*ai);
-		}
 	}
 
 	return ret;

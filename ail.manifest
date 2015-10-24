@@ -13,5 +13,6 @@
 		<filesystem path="/usr/bin/ail_filter" label="_" exec_label="none"/>
 		<filesystem path="/usr/bin/ail_initdb" label="_" exec_label="none"/>
 		<filesystem path="/usr/bin/ail_package" label="_" exec_label="none"/>
+		<filesystem path="/usr/bin/ail_test" label="_" exec_label="none"/>
 	</assign>
 </manifest>

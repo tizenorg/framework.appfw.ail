@@ -4,7 +4,7 @@ Summary:    Application Information Library
 Version:    0.2.95
 Release:    1
 Group:      System/Libraries
-License:    Apache License, Version 2.0
+License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
 Requires(post): /sbin/ldconfig
 Requires(postun): /sbin/ldconfig
@@ -15,6 +15,7 @@ BuildRequires:  pkgconfig(dlog)
 BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(db-util)
 BuildRequires:  pkgconfig(xdgmime)
+BuildRequires:  pkgconfig(glib-2.0)
 
 %description
 Application Information Library
@@ -50,8 +51,6 @@ mkdir -p %{buildroot}/usr/share/license
 cp LICENSE %{buildroot}/usr/share/license/%{name}
 
 %post
-vconftool set -t string db/ail/ail_info "0" -f -s system::vconf_inhouse
-vconftool set -t string db/menuscreen/desktop "0" -f -s system::vconf_inhouse
 
 CHDBGID="6010"
 

@@ -68,7 +68,7 @@ static void cleanup(void)
 static void utc_ApplicationFW_ail_desktop_update_func_01(void)
 {
 	ail_error_e r;
-	r = ail_desktop_update("com.samsung.calculator");
+	r = ail_desktop_update("org.tizen.calculator");
 	if (r != AIL_ERROR_OK) {
 		tet_infoline
 		    ("ail_desktop_update() failed in positive test case");

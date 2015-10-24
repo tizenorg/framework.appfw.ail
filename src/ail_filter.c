@@ -238,9 +238,9 @@ char *_get_where_clause(ail_filter_h filter)
 
 		strncat(w, c, sizeof(w)-strlen(w)-1);
 		w[sizeof(w)-1] = '\0';
-		if (c) {
-			free(c);
-			c = NULL;
+		if(c) {
+			 free(c);
+			 c = NULL;
 		}
 
 		if (g_slist_next(l)) {
@@ -393,8 +393,6 @@ EXPORT_API ail_error_e ail_filter_list_appinfo_foreach(ail_filter_h filter, ail_
 	}
 
 	ai = appinfo_create();
-	if (ai == NULL)
-		return AIL_ERROR_OUT_OF_MEMORY;
 
 	appinfo_set_stmt(ai, stmt);
 	while (db_step(stmt) == AIL_ERROR_OK) {

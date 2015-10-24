@@ -39,6 +39,7 @@
 #include "ail_sql.h"
 #include "ail.h"
 #include "ail_convert.h"
+#include "db-util.h"
 
 #define OPT_DESKTOP_DIRECTORY "/opt/share/applications"
 #define USR_DESKTOP_DIRECTORY "/usr/share/applications"
@@ -141,14 +142,13 @@ static ail_error_e _read_exec(void *data, char *tag, char *value)
 	}
 
 	token_exe_path = strtok_r(temp_exec, argsdelimiter, &save_ptr);
-	if (token_exe_path) {
-		info->x_slp_exe_path = strdup(token_exe_path);
-		if(!info->x_slp_exe_path) {
-			free(info->exec);
-			info->exec = NULL;
-			free(temp_exec);
-			return AIL_ERROR_OUT_OF_MEMORY;
-		}
+
+	info->x_slp_exe_path = strdup(token_exe_path);
+	if(!info->x_slp_exe_path) {
+		free(info->exec);
+		info->exec = NULL;
+		free(temp_exec);
+		return AIL_ERROR_OUT_OF_MEMORY;
 	}
 
 	free(temp_exec);
@@ -821,8 +821,6 @@ char *_pkgname_to_desktop(const char *package)
 	return desktop;
 }
 
-
-
 static inline int _strlen_desktop_info(desktop_info_s* info)
 {
 	int len = 0;
@@ -852,16 +850,20 @@ static inline int _strlen_desktop_info(desktop_info_s* info)
 	return len;
 }
 
-
 int __is_ail_initdb(void)
 {
-	if( getenv("AIL_INITDB") || getenv("INITDB") )
-		return 1;
-	else
-		return 0;
+	int ret = 0;
+	gchar **envp = g_get_environ();
+
+	if (envp) {
+		if (g_environ_getenv(envp, "AIL_INITDB") || g_environ_getenv(envp, "INITDB"))
+			ret = 1;
+
+		g_strfreev(envp);
+	}
+
+	return ret;
 }
-
-
 
 /* Manipulating desktop_info functions */
 static ail_error_e _init_desktop_info(desktop_info_s *info, const char *package)
@@ -1109,7 +1111,7 @@ static ail_error_e _modify_desktop_info_bool(desktop_info_s* info,
 	return AIL_ERROR_OK;
 }
 
-
+#if 0
 static ail_error_e _modify_desktop_info_str(desktop_info_s* info,
 						  const char *property,
 						  const char *value)
@@ -1144,9 +1146,7 @@ static ail_error_e _modify_desktop_info_str(desktop_info_s* info,
 
 	return AIL_ERROR_OK;
 }
-
-
-
+#endif
 
 static ail_error_e _create_table(void)
 {
@@ -1513,8 +1513,6 @@ static ail_error_e _send_db_done_noti(noti_type type, const char *package)
 	retv_if(!noti_string, AIL_ERROR_OUT_OF_MEMORY);
 
 	snprintf(noti_string, size, "%s:%s", type_string, package);
-	vconf_set_str(VCONFKEY_AIL_INFO_STATE, noti_string);
-	vconf_set_str(VCONFKEY_MENUSCREEN_DESKTOP, noti_string); // duplicate, will be removed
 	_D("Noti : %s", noti_string);
 
 	free(noti_string);
@@ -1801,7 +1799,6 @@ EXPORT_API ail_error_e ail_desktop_appinfo_modify_str(const char *appid,
 	retv_if(!appid, AIL_ERROR_INVALID_PARAMETER);
 
 	ail_error_e ret = 0;
-	sqlite3_stmt *stmt = NULL;
 	sqlite3 *appinfo_db = NULL;
 
 	_D("appinfo_modify_str : %s,  %s", appid, value);
@@ -1813,7 +1810,7 @@ EXPORT_API ail_error_e ail_desktop_appinfo_modify_str(const char *appid,
 	ret = sqlite3_exec(appinfo_db, query, NULL, NULL, NULL);
 	sqlite3_free(query);
 
-	query = sqlite3_mprintf("insert into package_app_app_control(app_id, app_control) values('%s', '%s')", appid, value);
+	query = sqlite3_mprintf("insert into package_app_app_control(app_id, app_control) values('%q', '%q')", appid, value);
 	ret = sqlite3_exec(appinfo_db, query, NULL, NULL, NULL);
 	sqlite3_free(query);
 	retv_if(ret != AIL_ERROR_OK, AIL_ERROR_DB_FAILED);

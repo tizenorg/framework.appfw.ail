@@ -319,7 +319,7 @@ int count_apps()
 		return -1;
 	}
 
-	ret = ail_filter_add_str(filter, AIL_PROP_PACKAGE_STR, "com.samsung.memo");
+	ret = ail_filter_add_str(filter, AIL_PROP_PACKAGE_STR, "org.tizen.memo";
 	if (ret != AIL_ERROR_OK) {
 		return -1;
 	}

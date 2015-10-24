@@ -84,7 +84,7 @@ static void utc_ApplicationFW_ail_appinfo_get_str_func_01(void)
 	ail_appinfo_h handle;
 	ail_error_e r;
 	char *value;
-	r = ail_package_get_appinfo("com.samsung.calculator", &handle);
+	r = ail_package_get_appinfo("org.tizen.calculator", &handle);
 	if (r != AIL_ERROR_OK) {
 		tet_result(TET_UNINITIATED);
 		return;
@@ -109,7 +109,7 @@ static void utc_ApplicationFW_ail_appinfo_get_str_func_02(void)
 	ail_error_e r;
 	ail_prop_str_e prop = AIL_PROP_STR_MIN - 1;
 	char *value;
-	r = ail_package_get_appinfo("com.samsung.calculator", &handle);
+	r = ail_package_get_appinfo("org.tizen.calculator", &handle);
 	if (r != AIL_ERROR_OK) {
 		tet_result(TET_UNINITIATED);
 		return;
@@ -134,7 +134,7 @@ static void utc_ApplicationFW_ail_appinfo_get_str_func_03(void)
 	ail_error_e r;
 	ail_prop_str_e prop = AIL_PROP_STR_MAX + 1;
 	char *value;
-	r = ail_package_get_appinfo("com.samsung.calculator", &handle);
+	r = ail_package_get_appinfo("org.tizen.calculator", &handle);
 	if (r != AIL_ERROR_OK) {
 		tet_result(TET_UNINITIATED);
 		return;
@@ -157,7 +157,7 @@ static void utc_ApplicationFW_ail_appinfo_get_str_func_04(void)
 {
 	ail_appinfo_h handle;
 	ail_error_e r;
-	r = ail_package_get_appinfo("com.samsung.calculator", &handle);
+	r = ail_package_get_appinfo("org.tizen.calculator", &handle);
 	if (r != AIL_ERROR_OK) {
 		tet_result(TET_UNINITIATED);
 		return;

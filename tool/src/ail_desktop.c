@@ -33,17 +33,17 @@ static void _print_help(const char *cmd)
 	fprintf(stderr, "[Add a desktop]\n");
 	fprintf(stderr, "       %s add <PACKAGE NAME>\n", cmd);
 	fprintf(stderr, "\n");
-	fprintf(stderr, "       Ex) %s add com.samsung.menu-screen\n", cmd);
+	fprintf(stderr, "       Ex) %s add org.tizen.menu-screen\n", cmd);
 	fprintf(stderr, "\n");
 	fprintf(stderr, "[Update a desktop]\n");
 	fprintf(stderr, "       %s update <PACKAGE NAME>\n", cmd);
 	fprintf(stderr, "\n");
-	fprintf(stderr, "       Ex) %s update com.samsung.menu-screen\n", cmd);
+	fprintf(stderr, "       Ex) %s update org.tizen.menu-screen\n", cmd);
 	fprintf(stderr, "\n");
 	fprintf(stderr, "[Remove a desktop]\n");
 	fprintf(stderr, "       %s remove <PACKAGE NAME>\n", cmd);
 	fprintf(stderr, "\n");
-	fprintf(stderr, "       Ex) %s remove com.samsung.menu-screen\n", cmd);
+	fprintf(stderr, "       Ex) %s remove org.tizen.menu-screen\n", cmd);
 	fprintf(stderr, "\n");
 }
 

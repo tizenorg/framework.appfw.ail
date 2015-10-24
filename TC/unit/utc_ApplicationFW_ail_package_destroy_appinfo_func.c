@@ -73,7 +73,7 @@ static void utc_ApplicationFW_ail_package_destroy_appinfo_func_01(void)
 {
 	ail_error_e r;
 	ail_appinfo_h handle;
-	r = ail_package_get_appinfo("com.samsung.calculator", &handle);
+	r = ail_package_get_appinfo("org.tizen.calculator", &handle);
 	if (r != AIL_ERROR_OK) {
 		tet_result(TET_UNINITIATED);
 		return;

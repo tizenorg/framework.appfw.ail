@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <glib.h>
 
 #include "ail.h"
 #include "ail_private.h"
@@ -254,8 +255,12 @@ int main(int argc, char *argv[])
 	const char *argv_rmjn[] = { "/bin/rm", APP_INFO_DB_FILE_JOURNAL, NULL };
 	xsystem(argv_rmjn);
 
-	ret = setenv("AIL_INITDB", "1", 1);
-	_D("AIL_INITDB : %d", ret);
+	gchar **envp = g_get_environ();
+	if (envp) {
+		envp = g_environ_setenv(envp, "AIL_INITDB", "1", TRUE);
+		_D("AIL_INITDB : %s", g_environ_getenv(envp, "AIL_INITDB"));
+		g_strfreev(envp);
+	}
 
 	ret = initdb_count_app();
 	if (ret > 0) {

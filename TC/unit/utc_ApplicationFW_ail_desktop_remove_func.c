@@ -68,7 +68,7 @@ static void cleanup(void)
 static void utc_ApplicationFW_ail_desktop_remove_func_01(void)
 {
 	ail_error_e r;
-	r = ail_desktop_remove("com.samsung.calculator");
+	r = ail_desktop_remove("org.tizen.calculator");
 	if (r != AIL_ERROR_OK) {
 		tet_infoline
 		    ("ail_desktop_remove() failed in positive test case");
